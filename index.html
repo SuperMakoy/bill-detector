@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>₱50 Bill Detector</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 60px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .header .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #c9b8ff;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 6px 16px;
+      border-radius: 100px;
+      margin-bottom: 16px;
+    }
+
+    .header h1 {
+      font-size: 2.6rem;
+      font-weight: 800;
+      background: linear-gradient(90deg, #fff 0%, #c9b8ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.2;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      color: rgba(255,255,255,0.5);
+      font-size: 0.95rem;
+    }
+
+    /* Total Banner */
+    .total-banner {
+      width: 100%;
+      max-width: 520px;
+      background: linear-gradient(135deg, #6c63ff, #a855f7);
+      border-radius: 20px;
+      padding: 24px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 32px rgba(108, 99, 255, 0.4);
+    }
+
+    .total-label {
+      color: rgba(255,255,255,0.8);
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .total-amount {
+      color: white;
+      font-size: 2.2rem;
+      font-weight: 800;
+    }
+
+    .bill-counts {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+    }
+
+    .count-pill {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 100px;
+    }
+
+    .count-pill.old { background: rgba(255,213,79,0.25); color: #ffd54f; }
+    .count-pill.new { background: rgba(102,187,106,0.25); color: #81c784; }
+
+    /* Main Card */
+    .card {
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px;
+      padding: 32px;
+      width: 100%;
+      max-width: 520px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    /* Upload Area */
+    .upload-area {
+      width: 100%;
+      height: 190px;
+      border: 2px dashed rgba(255,255,255,0.2);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: rgba(255,255,255,0.4);
+      gap: 10px;
+      transition: all 0.3s;
+      background: rgba(255,255,255,0.03);
+      position: relative;
+    }
+
+    .upload-area:hover {
+      border-color: #6c63ff;
+      color: #c9b8ff;
+      background: rgba(108,99,255,0.08);
+    }
+
+    .upload-area input { display: none; }
+    .upload-icon { font-size: 2.8rem; }
+    .upload-text { font-size: 0.95rem; font-weight: 500; color: rgba(255,255,255,0.6); }
+    .upload-sub { font-size: 0.78rem; color: rgba(255,255,255,0.3); }
+
+    /* Preview container with canvas overlay */
+    .preview-container {
+      width: 100%;
+      position: relative;
+      display: none;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(0,0,0,0.3);
+    }
+
+    #preview {
+      width: 100%;
+      max-height: 320px;
+      object-fit: contain;
+      display: block;
+    }
+
+    #boxCanvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* Loader */
+    .loader {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      color: rgba(255,255,255,0.5);
+      font-size: 0.9rem;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: #6c63ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Result */
+    #result {
+      width: 100%;
+      padding: 20px;
+      border-radius: 16px;
+      text-align: center;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      animation: popIn 0.3s ease;
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .result-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .result-sub {
+      font-size: 0.85rem;
+      opacity: 0.7;
+    }
+
+    /* Detection summary pills */
+    .detection-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 6px;
+    }
+
+    .det-pill {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 100px;
+    }
+
+    .det-pill.old { background: rgba(255,213,79,0.2); color: #ffd54f; border: 1px solid rgba(255,213,79,0.3); }
+    .det-pill.new { background: rgba(102,187,106,0.2); color: #81c784; border: 1px solid rgba(102,187,106,0.3); }
+
+    .result-success {
+      background: rgba(108,99,255,0.15);
+      border: 1.5px solid rgba(108,99,255,0.4);
+      color: #c9b8ff;
+    }
+
+    .result-error {
+      background: rgba(239,83,80,0.15);
+      border: 1.5px solid rgba(239,83,80,0.4);
+      color: #ef9a9a;
+    }
+
+    .result-warning {
+      background: rgba(255,213,79,0.15);
+      border: 1.5px solid rgba(255,213,79,0.4);
+      color: #ffd54f;
+    }
+
+    /* Buttons */
+    .btn-detect {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #6c63ff, #a855f7);
+      color: white;
+      border: none;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 20px rgba(108,99,255,0.4);
+    }
+
+    .btn-detect:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(108,99,255,0.5);
+    }
+
+    .btn-detect:disabled {
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.25);
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-retake {
+      width: 100%;
+      padding: 13px;
+      background: transparent;
+      color: rgba(255,255,255,0.6);
+      border: 1.5px solid rgba(255,255,255,0.15);
+      border-radius: 14px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: none;
+    }
+
+    .btn-retake:hover {
+      background: rgba(255,255,255,0.05);
+      color: white;
+      border-color: rgba(255,255,255,0.3);
+    }
+
+    /* History */
+    .history-card {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 24px;
+      padding: 28px 32px;
+      width: 100%;
+      max-width: 520px;
+    }
+
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .history-header h3 {
+      color: rgba(255,255,255,0.7);
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .btn-clear {
+      background: rgba(239,83,80,0.15);
+      border: 1px solid rgba(239,83,80,0.3);
+      color: #ef9a9a;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 100px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-clear:hover { background: rgba(239,83,80,0.25); }
+
+    .history-empty {
+      text-align: center;
+      color: rgba(255,255,255,0.2);
+      font-size: 0.9rem;
+      padding: 24px 0;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .history-item {
+      background: rgba(255,255,255,0.05);
+      border-radius: 14px;
+      padding: 14px 16px;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(-10px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    .history-item .item-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .item-scan-label {
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.4);
+      font-weight: 500;
+    }
+
+    .item-total {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #c9b8ff;
+    }
+
+    .item-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .item-pill {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 100px;
+    }
+
+    .item-pill.old { background: rgba(255,213,79,0.15); color: #ffd54f; }
+    .item-pill.new { background: rgba(102,187,106,0.15); color: #81c784; }
+
+    footer {
+      margin-top: 32px;
+      color: rgba(255,255,255,0.2);
+      font-size: 0.78rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="badge">🇵🇭 Philippine Peso</div>
+    <h1>₱50 Bill Detector</h1>
+    <p>Upload a photo — we'll detect, classify, and count your bills.</p>
+  </div>
+
+  <!-- Total Banner -->
+  <div class="total-banner">
+    <div>
+      <div class="total-label">Total Amount</div>
+      <div class="total-amount" id="totalAmount">₱0.00</div>
+    </div>
+    <div class="bill-counts">
+      <div class="count-pill old" id="oldCount">🏛️ 0 Old Bills</div>
+      <div class="count-pill new" id="newCount">✨ 0 New Bills</div>
+    </div>
+  </div>
+
+  <!-- Main Card -->
+  <div class="card">
+
+    <label class="upload-area" id="uploadArea">
+      <span class="upload-icon">📸</span>
+      <span class="upload-text">Click to upload a photo</span>
+      <span class="upload-sub">JPG or PNG • Multiple bills supported!</span>
+      <input type="file" id="imageInput" accept="image/*" onchange="handleImage(event)" />
+    </label>
+
+    <!-- Preview with bounding box canvas -->
+    <div class="preview-container" id="previewContainer">
+      <img id="preview" alt="Bill preview" />
+      <canvas id="boxCanvas"></canvas>
+    </div>
+
+    <div class="loader" id="loader">
+      <div class="spinner"></div>
+      <span>Detecting bills...</span>
+    </div>
+
+    <div id="result">
+      <div class="result-title" id="resultTitle"></div>
+      <div class="result-sub" id="resultSub"></div>
+      <div class="detection-pills" id="detectionPills"></div>
+    </div>
+
+    <button class="btn-detect" id="detectBtn" onclick="detect()" disabled>
+      🔍 Detect Bills
+    </button>
+
+    <button class="btn-retake" id="retakeBtn" onclick="retake()">
+      📷 Scan Another Photo
+    </button>
+
+  </div>
+
+  <!-- History -->
+  <div class="history-card">
+    <div class="history-header">
+      <h3>📋 Scan History</h3>
+      <button class="btn-clear" onclick="clearHistory()">Clear All</button>
+    </div>
+    <div id="historyEmpty" class="history-empty">No scans yet — upload a photo to start!</div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+  <footer>Powered by Roboflow RF-DETR &nbsp;·&nbsp; Built for school project 🎓</footer>
+
+  <script>
+    // ✏️ YOUR VALUES — Update MODEL_ID tomorrow when training is done!
+    const API_KEY = "ywviB9Noif9D8XXpb2i5";
+    const MODEL_ID = "50-peso-bill-detectorv2/1"; // ← UPDATE THIS TOMORROW
+
+    // Confidence threshold — detections below this % are ignored
+    const CONFIDENCE_THRESHOLD = 0.5;
+
+    let currentFile = null;
+    let totalAmount = 0;
+    let totalOld = 0;
+    let totalNew = 0;
+    let scanCount = 0;
+
+    function handleImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      currentFile = file;
+
+      const preview = document.getElementById("preview");
+      const container = document.getElementById("previewContainer");
+      const canvas = document.getElementById("boxCanvas");
+
+      preview.onload = () => {
+        canvas.width = preview.naturalWidth;
+        canvas.height = preview.naturalHeight;
+        canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+      };
+
+      preview.src = URL.createObjectURL(file);
+      container.style.display = "block";
+      document.getElementById("uploadArea").style.display = "none";
+      document.getElementById("detectBtn").disabled = false;
+      document.getElementById("retakeBtn").style.display = "block";
+      document.getElementById("result").style.display = "none";
+    }
+
+    function retake() {
+      currentFile = null;
+      document.getElementById("imageInput").value = "";
+      document.getElementById("previewContainer").style.display = "none";
+      document.getElementById("uploadArea").style.display = "flex";
+      document.getElementById("detectBtn").disabled = true;
+      document.getElementById("retakeBtn").style.display = "none";
+      document.getElementById("result").style.display = "none";
+      document.getElementById("loader").style.display = "none";
+      document.getElementById("boxCanvas").getContext("2d")
+        .clearRect(0, 0, 9999, 9999);
+    }
+
+    async function detect() {
+      if (!currentFile) return;
+
+      const detectBtn = document.getElementById("detectBtn");
+      const loader = document.getElementById("loader");
+      const result = document.getElementById("result");
+
+      detectBtn.disabled = true;
+      loader.style.display = "flex";
+      result.style.display = "none";
+
+      try {
+        const base64 = await toBase64(currentFile);
+        const imageData = base64.split(",")[1];
+
+        const response = await fetch(
+            `https://detect.roboflow.com/${MODEL_ID}?api_key=${API_KEY}&format=json`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: imageData,
+          }
+        );
+
+        const data = await response.json();
+        processDetections(data);
+
+      } catch (error) {
+        showError("Connection failed. Check your internet connection.");
+      } finally {
+        loader.style.display = "none";
+        detectBtn.disabled = false;
+      }
+    }
+
+    function processDetections(data) {
+      // Filter by confidence threshold and exclude not_bill
+      const validBills = (data.predictions || []).filter(p =>
+        p.confidence >= CONFIDENCE_THRESHOLD &&
+        (p.class === "old_50" || p.class === "new_50")
+      );
+
+      const notBillDetected = (data.predictions || []).some(p =>
+        p.class === "not_bill" && p.confidence >= CONFIDENCE_THRESHOLD
+      );
+
+      // No bills found at all
+      if (validBills.length === 0) {
+        if (notBillDetected) {
+          showWarning("⚠️ No ₱50 bills detected!", "The image doesn't appear to contain any valid ₱50 bills.");
+        } else {
+          showWarning("⚠️ No bills found!", "Try a clearer photo with the bill fully visible.");
+        }
+        drawBoxes([], data);
+        return;
+      }
+
+      // Count old and new
+      const oldBills = validBills.filter(p => p.class === "old_50");
+      const newBills = validBills.filter(p => p.class === "new_50");
+      const scanTotal = validBills.length * 50;
+
+      // Update global totals
+      totalAmount += scanTotal;
+      totalOld += oldBills.length;
+      totalNew += newBills.length;
+      scanCount++;
+
+      updateTotals();
+      drawBoxes(validBills, data);
+      showSuccess(validBills, oldBills, newBills, scanTotal);
+      addToHistory(oldBills.length, newBills.length, scanTotal);
+    }
+
+    function drawBoxes(bills, data) {
+      const canvas = document.getElementById("boxCanvas");
+      const preview = document.getElementById("preview");
+      const ctx = canvas.getContext("2d");
+
+      canvas.width = data.image?.width || preview.naturalWidth;
+      canvas.height = data.image?.height || preview.naturalHeight;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      bills.forEach(bill => {
+        const x = bill.x - bill.width / 2;
+        const y = bill.y - bill.height / 2;
+        const w = bill.width;
+        const h = bill.height;
+
+        const isOld = bill.class === "old_50";
+        const color = isOld ? "#ffd54f" : "#81c784";
+
+        // Box
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.strokeRect(x, y, w, h);
+        ctx.shadowBlur = 0;
+
+        // Label background
+        const label = `${isOld ? "Old ₱50" : "New ₱50"} ${Math.round(bill.confidence * 100)}%`;
+        ctx.font = "bold 16px Inter, sans-serif";
+        const textW = ctx.measureText(label).width;
+
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y - 26, textW + 16, 26);
+
+        // Label text
+        ctx.fillStyle = "#1a1a2e";
+        ctx.fillText(label, x + 8, y - 7);
+      });
+    }
+
+    function showSuccess(validBills, oldBills, newBills, scanTotal) {
+      const result = document.getElementById("result");
+      const title = document.getElementById("resultTitle");
+      const sub = document.getElementById("resultSub");
+      const pills = document.getElementById("detectionPills");
+
+      result.className = "result-success";
+      result.style.display = "flex";
+
+      title.textContent = `🎉 Found ${validBills.length} bill${validBills.length > 1 ? 's' : ''} — ₱${scanTotal}`;
+      sub.textContent = `This photo contains ₱${scanTotal} worth of ₱50 bills`;
+
+      pills.innerHTML = "";
+      if (oldBills.length > 0) {
+        pills.innerHTML += `<span class="det-pill old">🏛️ ${oldBills.length} Old Bill${oldBills.length > 1 ? 's' : ''}</span>`;
+      }
+      if (newBills.length > 0) {
+        pills.innerHTML += `<span class="det-pill new">✨ ${newBills.length} New Bill${newBills.length > 1 ? 's' : ''}</span>`;
+      }
+    }
+
+    function showWarning(title, sub) {
+      const result = document.getElementById("result");
+      result.className = "result-warning";
+      result.style.display = "flex";
+      document.getElementById("resultTitle").textContent = title;
+      document.getElementById("resultSub").textContent = sub;
+      document.getElementById("detectionPills").innerHTML = "";
+    }
+
+    function showError(msg) {
+      const result = document.getElementById("result");
+      result.className = "result-error";
+      result.style.display = "flex";
+      document.getElementById("resultTitle").textContent = "⚠️ " + msg;
+      document.getElementById("resultSub").textContent = "";
+      document.getElementById("detectionPills").innerHTML = "";
+    }
+
+    function updateTotals() {
+      document.getElementById("totalAmount").textContent = `₱${totalAmount.toFixed(2)}`;
+      document.getElementById("oldCount").textContent = `🏛️ ${totalOld} Old Bill${totalOld !== 1 ? 's' : ''}`;
+      document.getElementById("newCount").textContent = `✨ ${totalNew} New Bill${totalNew !== 1 ? 's' : ''}`;
+    }
+
+    function addToHistory(oldCount, newCount, scanTotal) {
+      document.getElementById("historyEmpty").style.display = "none";
+      const list = document.getElementById("historyList");
+      const item = document.createElement("div");
+      item.className = "history-item";
+
+      let pillsHTML = "";
+      if (oldCount > 0) pillsHTML += `<span class="item-pill old">🏛️ ${oldCount} Old</span>`;
+      if (newCount > 0) pillsHTML += `<span class="item-pill new">✨ ${newCount} New</span>`;
+
+      item.innerHTML = `
+        <div class="item-top">
+          <span class="item-scan-label">Scan #${scanCount}</span>
+          <span class="item-total">₱${scanTotal}</span>
+        </div>
+        <div class="item-pills">${pillsHTML}</div>
+      `;
+      list.prepend(item);
+    }
+
+    function clearHistory() {
+      totalAmount = 0; totalOld = 0; totalNew = 0; scanCount = 0;
+      updateTotals();
+      document.getElementById("historyList").innerHTML = "";
+      document.getElementById("historyEmpty").style.display = "block";
+      retake();
+    }
+
+    function toBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+  </script>
+
+</body>
+</html>
