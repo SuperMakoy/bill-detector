@@ -125,7 +125,7 @@ function generateReportHTML() {
   const html = `
     <div style="position:relative;font-family:'DM Sans','DM Mono',sans-serif;font-size:14px;color:#000;max-width:360px;margin:0 auto;padding:24px 20px;">
       <div style="text-align:center;margin-bottom:20px;">
-        <img src="assets/logo-p.png" alt="PiptiPipti" style="height:72px;width:auto;margin-bottom:12px;"/>
+        <img src="assets/logo-piptipipti.png" alt="PiptiPipti" style="height:100px;width:auto;margin-bottom:12px;"/>
         <div style="font-size:12px;color:#999;letter-spacing:1px;">₱50 BILL COUNTER</div>
       </div>
       <div style="border-top:1px solid #ddd;border-bottom:1px solid #ddd;padding:14px 0;margin-bottom:14px;text-align:center;font-size:12px;color:#666;">
@@ -178,36 +178,67 @@ function downloadReportImage() {
   container.style.left = '-9999px';
   container.style.top = '-9999px';
   container.style.backgroundColor = '#fff';
+  container.style.width = '360px';
+  container.style.padding = '0';
+  container.style.margin = '0';
   document.body.appendChild(container);
 
-  // Use html2canvas if available, otherwise use a simpler approach
-  if (typeof html2canvas !== 'undefined') {
-    html2canvas(container, { scale: 2, useCORS: true }).then(canvas => {
-      const link = document.createElement('a');
-      const now = new Date();
-      const dateStr = now.toISOString().split('T')[0];
-      link.href = canvas.toDataURL('image/png');
-      link.download = `bill-report-${dateStr}.png`;
-      link.click();
+  // Wait for image to load before converting to canvas
+  const imgs = container.querySelectorAll('img');
+  let loadedCount = 0;
+  
+  const finishDownload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 360;
+    canvas.height = container.offsetHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Use html2canvas if available
+    if (typeof html2canvas !== 'undefined') {
+      html2canvas(container, { scale: 2, useCORS: true, logging: false }).then(canvas => {
+        const link = document.createElement('a');
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        link.href = canvas.toDataURL('image/png');
+        link.download = `bill-report-${dateStr}.png`;
+        link.click();
+        document.body.removeChild(container);
+      }).catch(() => {
+        // Fallback to printing if html2canvas fails
+        const reportEl = document.getElementById('print-receipt');
+        reportEl.innerHTML = html;
+        window.print();
+        document.body.removeChild(container);
+      });
+    } else {
+      // If no html2canvas, use print dialog as fallback
+      const reportEl = document.getElementById('print-receipt');
+      reportEl.innerHTML = html;
+      window.print();
       document.body.removeChild(container);
-    });
+    }
+  };
+
+  if (imgs.length === 0) {
+    finishDownload();
   } else {
-    // Fallback: Create SVG from HTML for download
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];
-    const xmlString = new XMLSerializer().serializeToString(container);
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="600">
-      <foreignObject width="360" height="600">
-        ${xmlString}
-      </foreignObject>
-    </svg>`;
-    const blob = new Blob([svg], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `bill-report-${dateStr}.svg`;
-    link.click();
-    URL.revokeObjectURL(url);
-    document.body.removeChild(container);
+    imgs.forEach(img => {
+      img.onload = () => {
+        loadedCount++;
+        if (loadedCount === imgs.length) {
+          finishDownload();
+        }
+      };
+      img.onerror = () => {
+        loadedCount++;
+        if (loadedCount === imgs.length) {
+          finishDownload();
+        }
+      };
+      img.style.maxWidth = '100%';
+      img.style.display = 'block';
+    });
   }
 }
