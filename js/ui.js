@@ -108,9 +108,9 @@ function generateReceiptHash() {
 }
 
 /**
- * Generates and shows the print receipt
+ * Generates the report HTML
  */
-function printReceipt() {
+function generateReportHTML() {
   const d = getTodayData();
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -119,42 +119,95 @@ function printReceipt() {
   const receiptHash = generateReceiptHash();
 
   const lines = d.log.map(item =>
-    `<tr><td style="padding:4px 0;color:#555;">${item.time}</td><td style="padding:4px 8px;">${item.desc}</td><td style="padding:4px 0;text-align:right;font-weight:600;">₱${item.amount}</td></tr>`
+    `<tr><td style="padding:6px 0;color:#555;">${item.time}</td><td style="padding:6px 8px;">${item.desc}</td><td style="padding:6px 0;text-align:right;font-weight:600;">₱${item.amount}</td></tr>`
   ).join('');
 
   const html = `
-    <div style="position:relative;font-family:'DM Sans','DM Mono',sans-serif;font-size:12px;color:#000;max-width:360px;margin:0 auto;padding:24px 20px;">
-      <div style="text-align:center;margin-bottom:16px;">
-        <img src="assets/logo-p.png" alt="PiptiPipti" style="height:56px;width:auto;margin-bottom:8px;"/>
-        <div style="font-size:10px;color:#999;letter-spacing:1px;">₱50 BILL COUNTER</div>
+    <div style="position:relative;font-family:'DM Sans','DM Mono',sans-serif;font-size:14px;color:#000;max-width:360px;margin:0 auto;padding:24px 20px;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <img src="assets/logo-p.png" alt="PiptiPipti" style="height:72px;width:auto;margin-bottom:12px;"/>
+        <div style="font-size:12px;color:#999;letter-spacing:1px;">₱50 BILL COUNTER</div>
       </div>
-      <div style="border-top:1px solid #ddd;border-bottom:1px solid #ddd;padding:12px 0;margin-bottom:12px;text-align:center;font-size:10px;color:#666;">
+      <div style="border-top:1px solid #ddd;border-bottom:1px solid #ddd;padding:14px 0;margin-bottom:14px;text-align:center;font-size:12px;color:#666;">
         <div>${dateStr}</div>
-        <div>Printed: ${timeStr}</div>
-        <div style="margin-top:4px;font-family:'DM Mono',monospace;font-size:9px;">ID: ${receiptId}</div>
-        ${d.note ? `<div style="margin-top:6px;font-style:italic;color:#555;">Note: ${d.note}</div>` : ''}
+        <div>Generated: ${timeStr}</div>
+        <div style="margin-top:6px;font-family:'DM Mono',monospace;font-size:10px;">ID: ${receiptId}</div>
+        ${d.note ? `<div style="margin-top:8px;font-style:italic;color:#555;font-size:11px;">Note: ${d.note}</div>` : ''}
       </div>
-      <div style="border-top:1px solid #ddd;border-bottom:1px solid #ddd;padding:8px 0;margin-bottom:12px;">
+      <div style="border-top:1px solid #ddd;border-bottom:1px solid #ddd;padding:10px 0;margin-bottom:14px;">
         <table style="width:100%;border-collapse:collapse;">
-          ${lines || '<tr><td colspan="3" style="padding:8px 0;color:#ccc;text-align:center;font-size:11px;">No entries</td></tr>'}
+          ${lines || '<tr><td colspan="3" style="padding:10px 0;color:#ccc;text-align:center;font-size:12px;">No entries</td></tr>'}
         </table>
       </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px;">
         <span>Old Bills (₱50)</span><span>${d.old} × ₱50 = ₱${d.old * 50}</span>
       </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:11px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:14px;font-size:12px;">
         <span>New Bills (₱50)</span><span>${d.new} × ₱50 = ₱${d.new * 50}</span>
       </div>
-      <div style="border-top:2px solid #000;padding-top:10px;display:flex;justify-content:space-between;font-size:14px;font-weight:700;">
+      <div style="border-top:2px solid #000;padding-top:12px;display:flex;justify-content:space-between;font-size:16px;font-weight:700;">
         <span>TOTAL</span><span>₱${d.total}</span>
       </div>
-      <div style="text-align:center;margin-top:16px;font-size:8px;color:#ddd;font-family:'DM Mono',monospace;position:relative;padding-bottom:4px;">
+      <div style="text-align:center;margin-top:18px;font-size:9px;color:#ddd;font-family:'DM Mono',monospace;position:relative;padding-bottom:4px;">
         ${receiptHash}
       </div>
     </div>
   `;
+  
+  return html;
+}
 
-  const receiptEl = document.getElementById('print-receipt');
-  receiptEl.innerHTML = html;
+/**
+ * Prints today's report
+ */
+function printReport() {
+  const html = generateReportHTML();
+  const reportEl = document.getElementById('print-receipt');
+  reportEl.innerHTML = html;
   window.print();
+}
+
+/**
+ * Downloads today's report as an image
+ */
+function downloadReportImage() {
+  const html = generateReportHTML();
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  container.style.position = 'fixed';
+  container.style.left = '-9999px';
+  container.style.top = '-9999px';
+  container.style.backgroundColor = '#fff';
+  document.body.appendChild(container);
+
+  // Use html2canvas if available, otherwise use a simpler approach
+  if (typeof html2canvas !== 'undefined') {
+    html2canvas(container, { scale: 2, useCORS: true }).then(canvas => {
+      const link = document.createElement('a');
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      link.href = canvas.toDataURL('image/png');
+      link.download = `bill-report-${dateStr}.png`;
+      link.click();
+      document.body.removeChild(container);
+    });
+  } else {
+    // Fallback: Create SVG from HTML for download
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const xmlString = new XMLSerializer().serializeToString(container);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="600">
+      <foreignObject width="360" height="600">
+        ${xmlString}
+      </foreignObject>
+    </svg>`;
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bill-report-${dateStr}.svg`;
+    link.click();
+    URL.revokeObjectURL(url);
+    document.body.removeChild(container);
+  }
 }
