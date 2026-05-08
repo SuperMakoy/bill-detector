@@ -181,64 +181,64 @@ function downloadReportImage() {
   container.style.width = '360px';
   container.style.padding = '0';
   container.style.margin = '0';
+  container.style.fontFamily = "'DM Sans', 'DM Mono', sans-serif";
   document.body.appendChild(container);
 
-  // Wait for image to load before converting to canvas
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0];
+
+  // Wait for images to load
   const imgs = container.querySelectorAll('img');
   let loadedCount = 0;
   
-  const finishDownload = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 360;
-    canvas.height = container.offsetHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
+  const performDownload = () => {
     // Use html2canvas if available
     if (typeof html2canvas !== 'undefined') {
-      html2canvas(container, { scale: 2, useCORS: true, logging: false }).then(canvas => {
+      html2canvas(container, { 
+        scale: 2, 
+        useCORS: true, 
+        logging: false,
+        backgroundColor: '#ffffff'
+      }).then(canvas => {
         const link = document.createElement('a');
-        const now = new Date();
-        const dateStr = now.toISOString().split('T')[0];
         link.href = canvas.toDataURL('image/png');
         link.download = `bill-report-${dateStr}.png`;
         link.click();
-        document.body.removeChild(container);
-      }).catch(() => {
-        // Fallback to printing if html2canvas fails
-        const reportEl = document.getElementById('print-receipt');
-        reportEl.innerHTML = html;
-        window.print();
+        setTimeout(() => {
+          document.body.removeChild(container);
+        }, 100);
+      }).catch(err => {
+        console.log('[v0] Download error:', err);
+        alert('Download failed. Please use Print instead.');
         document.body.removeChild(container);
       });
     } else {
-      // If no html2canvas, use print dialog as fallback
-      const reportEl = document.getElementById('print-receipt');
-      reportEl.innerHTML = html;
-      window.print();
+      alert('html2canvas library not found. Please use Print instead.');
       document.body.removeChild(container);
     }
   };
 
   if (imgs.length === 0) {
-    finishDownload();
+    performDownload();
   } else {
+    // Wait for all images to load
     imgs.forEach(img => {
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === imgs.length) {
-          finishDownload();
-        }
-      };
-      img.onerror = () => {
-        loadedCount++;
-        if (loadedCount === imgs.length) {
-          finishDownload();
-        }
-      };
       img.style.maxWidth = '100%';
       img.style.display = 'block';
+      
+      const checkLoad = () => {
+        loadedCount++;
+        if (loadedCount === imgs.length) {
+          setTimeout(performDownload, 100);
+        }
+      };
+      
+      if (img.complete) {
+        checkLoad();
+      } else {
+        img.onload = checkLoad;
+        img.onerror = checkLoad;
+      }
     });
   }
 }
