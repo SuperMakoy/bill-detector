@@ -13,6 +13,46 @@ function openCamera() {
   document.getElementById('cameraInput').click();
 }
 
+// Audio context for sound feedback (initialized on first user interaction)
+let audioCtx = null;
+
+/**
+ * Initializes audio context (must be called from user interaction)
+ */
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+/**
+ * Plays a beep sound
+ * @param {number} frequency - Frequency in Hz
+ * @param {number} duration - Duration in seconds
+ * @param {number} volume - Volume (0-1)
+ */
+function playBeep(frequency, duration, volume) {
+  if (!audioCtx) return;
+  
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  
+  oscillator.frequency.value = frequency;
+  oscillator.type = 'sine';
+  
+  gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  
+  oscillator.start(audioCtx.currentTime);
+  oscillator.stop(audioCtx.currentTime + duration);
+}
+
 /**
  * Plays success feedback (sound + vibration)
  * @param {string} type - 'success', 'warning', or 'error'
@@ -29,34 +69,15 @@ function playFeedback(type) {
     }
   }
   
-  // Sound feedback using Web Audio API
-  try {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    
-    if (type === 'success') {
-      // Pleasant ascending tone
-      oscillator.frequency.setValueAtTime(523, audioCtx.currentTime); // C5
-      oscillator.frequency.setValueAtTime(659, audioCtx.currentTime + 0.1); // E5
-      oscillator.frequency.setValueAtTime(784, audioCtx.currentTime + 0.2); // G5
-      gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
-      oscillator.start(audioCtx.currentTime);
-      oscillator.stop(audioCtx.currentTime + 0.35);
-    } else if (type === 'warning') {
-      // Neutral tone
-      oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
-      gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-      oscillator.start(audioCtx.currentTime);
-      oscillator.stop(audioCtx.currentTime + 0.2);
-    }
-  } catch (e) {
-    // Audio not supported, ignore
+  // Sound feedback
+  if (type === 'success') {
+    // Pleasant ascending chime (C5 -> E5 -> G5)
+    playBeep(523, 0.15, 0.3);
+    setTimeout(() => playBeep(659, 0.15, 0.3), 100);
+    setTimeout(() => playBeep(784, 0.2, 0.3), 200);
+  } else if (type === 'warning') {
+    // Single neutral tone
+    playBeep(440, 0.25, 0.25);
   }
 }
 
@@ -107,6 +128,9 @@ function retake() {
  */
 async function detect() {
   if (!currentFile) return;
+  
+  // Initialize audio on user interaction (required for mobile browsers)
+  initAudio();
   
   const scanBtn = document.getElementById('scanBtn');
   const loader = document.getElementById('loader');

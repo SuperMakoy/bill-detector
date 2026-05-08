@@ -3,8 +3,8 @@
  * Handles localStorage operations and data structures
  */
 
-// Undo stack for reverting changes
-let undoStack = [];
+// Store only the last scan for undo (single undo, not a stack)
+let lastScanBackup = null;
 
 /**
  * Creates an empty week data structure
@@ -94,9 +94,8 @@ function addToToday(oldCount, newCount, desc, type) {
   const d = data.currentWeek[today];
   const amount = (oldCount + newCount) * 50;
   
-  // Save current state to undo stack
-  undoStack.push(JSON.parse(JSON.stringify(d)));
-  if (undoStack.length > 20) undoStack.shift();
+  // Save current state for undo (only the last scan)
+  lastScanBackup = JSON.parse(JSON.stringify(d));
   
   // Update totals
   d.total += amount;
@@ -121,20 +120,22 @@ function addToToday(oldCount, newCount, desc, type) {
 }
 
 /**
- * Undoes the last scan action
+ * Undoes the last scan action (single undo only)
  */
 function undoLastScan() {
-  if (undoStack.length === 0) {
+  if (!lastScanBackup) {
     showToast('Nothing to undo', 'warning');
     return;
   }
   
   const data = loadData();
   const today = getTodayName();
-  const previousState = undoStack.pop();
   
-  data.currentWeek[today] = previousState;
+  data.currentWeek[today] = lastScanBackup;
   saveData(data);
+  
+  // Clear backup after undo (can only undo once)
+  lastScanBackup = null;
   
   refreshTodayUI();
   showToast('Last scan undone', 'warning');
@@ -173,7 +174,7 @@ function endWeek() {
   
   data.currentWeek = getEmptyWeek();
   saveData(data);
-  undoStack = [];
+  lastScanBackup = null;
   
   refreshTodayUI();
   renderWeekView();
@@ -195,7 +196,7 @@ function resetToday() {
     log: []
   };
   saveData(data);
-  undoStack = [];
+  lastScanBackup = null;
   document.getElementById('dayNote').value = '';
   refreshTodayUI();
   retake();
@@ -207,7 +208,7 @@ function resetToday() {
  */
 function clearAll() {
   localStorage.removeItem('piptiData');
-  undoStack = [];
+  lastScanBackup = null;
   refreshTodayUI();
   renderHistoryView();
   retake();
