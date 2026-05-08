@@ -273,45 +273,71 @@ body {
 
 .card-body { padding: 20px; }
 
-/* Upload zone */
-.upload-zone {
-  border: 1.5px dashed var(--border2);
-  border-radius: var(--radius-sm);
-  padding: 36px 20px;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: var(--bg);
+/* Capture Options */
+.capture-options {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
+  gap: 10px;
 }
 
-.upload-zone:hover { border-color: var(--text2); background: var(--surface2); }
-.upload-zone input { display: none; }
+.capture-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
 
-.upload-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+.capture-btn:hover {
+  border-color: var(--border2);
   background: var(--surface2);
+}
+
+.capture-btn.camera {
+  border-color: var(--green);
+  background: var(--green-light);
+}
+
+.capture-btn.camera:hover {
+  background: #c8e9db;
+  border-color: var(--green);
+}
+
+.capture-btn.camera .capture-icon {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.capture-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--surface);
   border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 4px;
+  flex-shrink: 0;
 }
 
-.upload-title {
+.capture-title {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text);
+  font-family: 'DM Sans', sans-serif;
 }
 
-.upload-sub {
+.capture-sub {
   font-size: 0.72rem;
   color: var(--text3);
+  font-family: 'DM Sans', sans-serif;
+  margin-top: 1px;
 }
 
 /* Preview */
@@ -402,6 +428,11 @@ body {
 
 .sec-btn:hover { background: var(--surface2); border-color: var(--border2); color: var(--text); }
 .sec-btn.danger:hover { background: var(--red-light); color: var(--red); border-color: #E8B4BA; }
+.sec-btn.undo { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.sec-btn.undo:hover { background: var(--gold-light); color: #7A5E1A; border-color: #E8D499; }
+.sec-btn.undo:disabled { opacity: 0.4; cursor: not-allowed; }
+.sec-btn.undo:disabled:hover { background: var(--surface); color: var(--text2); border-color: var(--border); }
+.sec-btn.full-width { width: 100%; margin-top: 8px; }
 
 /* Loader */
 .loader {
@@ -892,6 +923,11 @@ body {
   .hwc-days { grid-template-columns: repeat(4, 1fr); }
   .bottom-nav { display: flex !important; position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 6px 0 env(safe-area-inset-bottom, 6px); z-index: 50; }
   .wsb-item:nth-child(n+4), .wsb-divider:nth-child(n+3) { display: none; }
+  
+  /* Stack capture buttons vertically on mobile */
+  .capture-options { flex-direction: column; }
+  .capture-btn { padding: 14px; }
+  .capture-icon { width: 40px; height: 40px; }
 }
 
 /* scrollbar */

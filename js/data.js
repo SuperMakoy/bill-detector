@@ -121,6 +121,27 @@ function addToToday(oldCount, newCount, desc, type) {
 }
 
 /**
+ * Undoes the last scan action
+ */
+function undoLastScan() {
+  if (undoStack.length === 0) {
+    showToast('Nothing to undo', 'warning');
+    return;
+  }
+  
+  const data = loadData();
+  const today = getTodayName();
+  const previousState = undoStack.pop();
+  
+  data.currentWeek[today] = previousState;
+  saveData(data);
+  
+  refreshTodayUI();
+  showToast('Last scan undone', 'warning');
+  playFeedback('warning');
+}
+
+/**
  * Loads the day note into the textarea
  */
 function loadDayNote() {

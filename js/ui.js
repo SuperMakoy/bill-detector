@@ -21,10 +21,17 @@ function refreshTodayUI() {
   // Update sidebar week summary
   refreshSidebarWeek();
   
-  // Update undo button if exists
+  // Update undo button state
   const undoBtn = document.getElementById('undoBtn');
   if (undoBtn) {
     undoBtn.disabled = undoStack.length === 0;
+  }
+  
+  // Update undo button text to show count
+  if (undoBtn && undoStack.length > 0) {
+    undoBtn.innerHTML = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> Undo (${undoStack.length})`;
+  } else if (undoBtn) {
+    undoBtn.innerHTML = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> Undo`;
   }
 }
 

@@ -7,6 +7,60 @@
 let currentFile = null;
 
 /**
+ * Opens the device camera directly
+ */
+function openCamera() {
+  document.getElementById('cameraInput').click();
+}
+
+/**
+ * Plays success feedback (sound + vibration)
+ * @param {string} type - 'success', 'warning', or 'error'
+ */
+function playFeedback(type) {
+  // Vibration feedback (mobile devices)
+  if ('vibrate' in navigator) {
+    if (type === 'success') {
+      navigator.vibrate([50, 30, 50]); // Double tap for success
+    } else if (type === 'warning') {
+      navigator.vibrate(100); // Single pulse for warning
+    } else if (type === 'error') {
+      navigator.vibrate([100, 50, 100, 50, 100]); // Triple for error
+    }
+  }
+  
+  // Sound feedback using Web Audio API
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    if (type === 'success') {
+      // Pleasant ascending tone
+      oscillator.frequency.setValueAtTime(523, audioCtx.currentTime); // C5
+      oscillator.frequency.setValueAtTime(659, audioCtx.currentTime + 0.1); // E5
+      oscillator.frequency.setValueAtTime(784, audioCtx.currentTime + 0.2); // G5
+      gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.35);
+    } else if (type === 'warning') {
+      // Neutral tone
+      oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
+      gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.2);
+    }
+  } catch (e) {
+    // Audio not supported, ignore
+  }
+}
+
+/**
  * Handles file selection from input
  * @param {Event} e - Change event from file input
  */
@@ -26,7 +80,7 @@ function handleFile(e) {
   
   preview.src = URL.createObjectURL(file);
   document.getElementById('previewWrap').style.display = 'block';
-  document.getElementById('uploadZone').style.display = 'none';
+  document.getElementById('captureOptions').style.display = 'none';
   document.getElementById('scanBtn').disabled = false;
   document.getElementById('retakeBtn').style.display = 'block';
   document.getElementById('resultBox').style.display = 'none';
@@ -38,8 +92,9 @@ function handleFile(e) {
 function retake() {
   currentFile = null;
   document.getElementById('fileInput').value = '';
+  document.getElementById('cameraInput').value = '';
   document.getElementById('previewWrap').style.display = 'none';
-  document.getElementById('uploadZone').style.display = 'flex';
+  document.getElementById('captureOptions').style.display = 'flex';
   document.getElementById('scanBtn').disabled = true;
   document.getElementById('retakeBtn').style.display = 'none';
   document.getElementById('resultBox').style.display = 'none';
@@ -94,9 +149,10 @@ function processDetections(data) {
   
   drawBoxes(valid, data);
   
-  if (valid.length === 0) {
-    showResult('warning', notBill ? 'Not a ₱50 bill' : 'No bills found', 'Try a clearer photo with the bills visible.', []);
-    return;
+if (valid.length === 0) {
+  playFeedback('warning');
+  showResult('warning', notBill ? 'Not a ₱50 bill' : 'No bills found', 'Try a clearer photo with the bills visible.', []);
+  return;
   }
   
   const oldBills = valid.filter(p => p.class === 'old_50');
@@ -109,6 +165,7 @@ function processDetections(data) {
   if (oldBills.length > 0) tags.push(`<span class="tag gold">${oldBills.length} Old</span>`);
   if (newBills.length > 0) tags.push(`<span class="tag green">${newBills.length} New</span>`);
   
+  playFeedback('success');
   showResult('success', `Found ${valid.length} bill${valid.length > 1 ? 's' : ''} — ₱${total}`, `Added ₱${total} to today's total`, tags);
   showToast(`Added ₱${total}`, 'success');
 }
