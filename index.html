@@ -247,6 +247,20 @@
     <!-- SETTINGS VIEW -->
     <div class="view" id="view-settings">
       <div class="settings-grid">
+        <!-- Device Info Card - First so users see it prominently -->
+        <div class="setting-card device-card">
+          <div class="device-header">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01" stroke-width="2"/></svg>
+            <div class="setting-label">This Device</div>
+          </div>
+          <div class="device-id-display">
+            <span class="device-id-value" id="deviceIdDisplay">----</span>
+          </div>
+          <div class="setting-desc">
+            Your data is tied to this device only. Different phones or browsers will have their own separate data.
+          </div>
+        </div>
+
         <div class="setting-card">
           <div class="setting-label">End Week</div>
           <div class="setting-desc">Save the current week's summary to history and start fresh.</div>
