@@ -10,6 +10,9 @@
   
   <!-- Styles -->
   <link rel="stylesheet" href="css/styles.css"/>
+  
+  <!-- html2canvas for image export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -19,7 +22,6 @@
   <aside class="sidebar">
     <div class="logo">
       <img src="assets/logo-piptipipti.png" alt="PiptiPipti" class="logo-image"/>
-      <div class="logo-sub">₱50 Bill Counter</div>
     </div>
 
     <div class="nav-section">
@@ -175,10 +177,16 @@
             <div class="day-note-section">
               <div class="day-note-label">Note</div>
               <textarea class="day-note" id="dayNote" placeholder="Add a note for today..." onchange="saveDayNote()"></textarea>
-              <button class="print-btn" onclick="printReceipt()">
-                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6,18H4a2,2,0,0,1-2-2V11a2,2,0,0,1,2-2H20a2,2,0,0,1,2,2v5a2,2,0,0,1-2,2H18"/><rect x="6" y="14" width="12" height="8"/></svg>
-                Print Receipt
-              </button>
+              <div class="report-btn-group">
+                <button class="report-btn" onclick="printReport()" title="Print today's report">
+                  <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6,18H4a2,2,0,0,1-2-2V11a2,2,0,0,1,2-2H20a2,2,0,0,1,2,2v5a2,2,0,0,1-2,2H18"/><rect x="6" y="14" width="12" height="8"/></svg>
+                  Print
+                </button>
+                <button class="report-btn" onclick="downloadReportImage()" title="Download as image">
+                  <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Download
+                </button>
+              </div>
             </div>
           </div>
         </div>
