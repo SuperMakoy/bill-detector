@@ -86,3 +86,47 @@ function showToast(msg, type = 'success') {
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
 }
+
+/**
+ * Shows the import data modal
+ */
+function showImportModal() {
+  document.getElementById('importCodeInput').value = '';
+  document.getElementById('importModalOverlay').classList.add('open');
+}
+
+/**
+ * Closes the import data modal
+ */
+function closeImportModal() {
+  document.getElementById('importModalOverlay').classList.remove('open');
+}
+
+/**
+ * Confirms and processes data import
+ */
+function confirmImportData() {
+  const code = document.getElementById('importCodeInput').value;
+  
+  if (!code.trim()) {
+    showToast('Please paste a data code', 'warning');
+    return;
+  }
+  
+  const result = importDataCode(code);
+  
+  if (result.success) {
+    closeImportModal();
+    showToast(result.message, 'success');
+    playFeedback('success');
+    
+    // Refresh all UI
+    refreshTodayUI();
+    refreshSidebarWeek();
+    renderWeekView();
+    renderHistoryView();
+    loadDayNote();
+  } else {
+    showToast(result.message, 'error');
+  }
+}
