@@ -20,6 +20,9 @@ function init() {
   // Set today's label
   document.getElementById('today-day-label').textContent = getTodayName();
   
+  // Display device ID in settings
+  document.getElementById('deviceIdDisplay').textContent = getShortDeviceId();
+  
   // Initialize UI
   refreshTodayUI();
   refreshSidebarWeek();

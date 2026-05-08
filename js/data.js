@@ -7,6 +7,50 @@
 let lastScanBackup = null;
 
 /**
+ * Generates a unique device ID (UUID v4)
+ * @returns {string} A unique identifier
+ */
+function generateDeviceId() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+/**
+ * Gets or creates a unique device ID for this browser/device
+ * Stored separately so it persists even if app data is cleared
+ * @returns {string} The device ID
+ */
+function getDeviceId() {
+  let deviceId = localStorage.getItem('pipti_device_id');
+  if (!deviceId) {
+    deviceId = generateDeviceId();
+    localStorage.setItem('pipti_device_id', deviceId);
+  }
+  return deviceId;
+}
+
+/**
+ * Gets the localStorage key for this device's data
+ * @returns {string} Device-specific storage key
+ */
+function getStorageKey() {
+  return `piptiData_${getDeviceId()}`;
+}
+
+/**
+ * Gets a shortened version of the device ID for display
+ * @returns {string} Short device ID (e.g., "A1B2-C3D4")
+ */
+function getShortDeviceId() {
+  const deviceId = getDeviceId();
+  const parts = deviceId.split('-');
+  return `${parts[0].slice(0, 4).toUpperCase()}-${parts[1].toUpperCase()}`;
+}
+
+/**
  * Creates an empty week data structure
  * @returns {Object} Empty week with all days initialized
  */
@@ -26,11 +70,11 @@ function getEmptyWeek() {
 }
 
 /**
- * Loads data from localStorage
+ * Loads data from localStorage (device-specific)
  * @returns {Object} Application data with currentWeek and history
  */
 function loadData() {
-  const raw = localStorage.getItem('piptiData');
+  const raw = localStorage.getItem(getStorageKey());
   if (!raw) {
     return {
       currentWeek: getEmptyWeek(),
@@ -41,11 +85,11 @@ function loadData() {
 }
 
 /**
- * Saves data to localStorage
+ * Saves data to localStorage (device-specific)
  * @param {Object} data - Application data to save
  */
 function saveData(data) {
-  localStorage.setItem('piptiData', JSON.stringify(data));
+  localStorage.setItem(getStorageKey(), JSON.stringify(data));
 }
 
 /**
@@ -204,10 +248,10 @@ function resetToday() {
 }
 
 /**
- * Clears all application data
+ * Clears all application data (keeps device ID)
  */
 function clearAll() {
-  localStorage.removeItem('piptiData');
+  localStorage.removeItem(getStorageKey());
   lastScanBackup = null;
   refreshTodayUI();
   renderHistoryView();
