@@ -20,8 +20,10 @@ function init() {
   // Set today's label
   document.getElementById('today-day-label').textContent = getTodayName();
   
-  // Display device ID in settings
+  // Display device info in settings
   document.getElementById('deviceIdDisplay').textContent = getShortDeviceId();
+  document.getElementById('deviceIconDisplay').innerHTML = getDeviceIcon();
+  document.getElementById('deviceTypeLabel').textContent = getDeviceTypeLabel();
   
   // Initialize UI
   refreshTodayUI();
@@ -31,6 +33,11 @@ function init() {
   // Setup modal close on overlay click
   document.getElementById('modalOverlay').addEventListener('click', function(e) {
     if (e.target === this) closeModal();
+  });
+  
+  // Setup import modal close on overlay click
+  document.getElementById('importModalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeImportModal();
   });
 }
 

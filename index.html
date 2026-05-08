@@ -250,14 +250,36 @@
         <!-- Device Info Card - First so users see it prominently -->
         <div class="setting-card device-card">
           <div class="device-header">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01" stroke-width="2"/></svg>
-            <div class="setting-label">This Device</div>
+            <span id="deviceIconDisplay"></span>
+            <div class="setting-label">This <span id="deviceTypeLabel">Device</span></div>
           </div>
           <div class="device-id-display">
             <span class="device-id-value" id="deviceIdDisplay">----</span>
           </div>
           <div class="setting-desc">
             Your data is tied to this device only. Different phones or browsers will have their own separate data.
+          </div>
+          
+          <!-- Link Device Section -->
+          <div class="device-link-section">
+            <div class="device-link-divider">
+              <span>Sync with another device</span>
+            </div>
+            
+            <div class="device-link-buttons">
+              <button class="device-link-btn export" onclick="copyDataToClipboard()">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                Copy My Data
+              </button>
+              <button class="device-link-btn import" onclick="showImportModal()">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Import Data
+              </button>
+            </div>
+            
+            <div class="device-link-help">
+              To sync: Copy data from one device, then Import on another.
+            </div>
           </div>
         </div>
 
@@ -324,6 +346,23 @@
     <div class="modal-btns">
       <button class="modal-cancel" onclick="closeModal()">Cancel</button>
       <button class="modal-confirm" id="modalConfirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div class="modal-overlay" id="importModalOverlay">
+  <div class="modal import-modal">
+    <div class="modal-title">Import Data</div>
+    <div class="modal-desc">Paste the data code from your other device below:</div>
+    <textarea class="import-textarea" id="importCodeInput" placeholder="Paste data code here..."></textarea>
+    <div class="import-warning">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      This will replace your current data on this device.
+    </div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeImportModal()">Cancel</button>
+      <button class="modal-confirm" onclick="confirmImportData()">Import</button>
     </div>
   </div>
 </div>

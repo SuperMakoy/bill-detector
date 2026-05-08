@@ -51,6 +51,125 @@ function getShortDeviceId() {
 }
 
 /**
+ * Detects the type of device based on user agent and screen size
+ * @returns {string} Device type: 'phone', 'tablet', 'desktop', or 'other'
+ */
+function getDeviceType() {
+  const ua = navigator.userAgent.toLowerCase();
+  const screenWidth = window.innerWidth;
+  
+  // Check for mobile phones
+  const isMobile = /iphone|ipod|android.*mobile|windows phone|blackberry|bb10/i.test(ua);
+  if (isMobile) return 'phone';
+  
+  // Check for tablets
+  const isTablet = /ipad|android(?!.*mobile)|tablet|kindle|silk/i.test(ua) || 
+                   (screenWidth >= 600 && screenWidth <= 1024 && 'ontouchstart' in window);
+  if (isTablet) return 'tablet';
+  
+  // Check for desktop/laptop (no touch or large screen)
+  const isDesktop = screenWidth > 1024 || !('ontouchstart' in window);
+  if (isDesktop) return 'desktop';
+  
+  return 'other';
+}
+
+/**
+ * Gets the SVG icon for the current device type
+ * @returns {string} SVG HTML string
+ */
+function getDeviceIcon() {
+  const type = getDeviceType();
+  
+  const icons = {
+    phone: '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01" stroke-width="2"/></svg>',
+    tablet: '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01" stroke-width="2"/></svg>',
+    desktop: '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
+    other: '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16.01" stroke-width="2"/></svg>'
+  };
+  
+  return icons[type] || icons.other;
+}
+
+/**
+ * Gets human-readable device type label
+ * @returns {string} Device type label
+ */
+function getDeviceTypeLabel() {
+  const labels = {
+    phone: 'Phone',
+    tablet: 'Tablet',
+    desktop: 'Desktop',
+    other: 'Device'
+  };
+  return labels[getDeviceType()] || 'Device';
+}
+
+/**
+ * Exports current data as a shareable code (base64 encoded)
+ * @returns {string} Encoded data string
+ */
+function exportDataCode() {
+  const data = loadData();
+  const exportObj = {
+    deviceId: getShortDeviceId(),
+    deviceType: getDeviceTypeLabel(),
+    exportedAt: new Date().toISOString(),
+    data: data
+  };
+  return btoa(encodeURIComponent(JSON.stringify(exportObj)));
+}
+
+/**
+ * Imports data from a shareable code
+ * @param {string} code - Base64 encoded data string
+ * @returns {Object} Result with success boolean and message
+ */
+function importDataCode(code) {
+  try {
+    const decoded = JSON.parse(decodeURIComponent(atob(code.trim())));
+    
+    if (!decoded.data || !decoded.data.currentWeek) {
+      return { success: false, message: 'Invalid data format' };
+    }
+    
+    // Save imported data
+    saveData(decoded.data);
+    
+    return { 
+      success: true, 
+      message: `Data imported from ${decoded.deviceType} (${decoded.deviceId})`,
+      sourceDevice: decoded.deviceId,
+      sourceType: decoded.deviceType
+    };
+  } catch (e) {
+    return { success: false, message: 'Invalid code. Please check and try again.' };
+  }
+}
+
+/**
+ * Copies data code to clipboard
+ */
+async function copyDataToClipboard() {
+  const code = exportDataCode();
+  try {
+    await navigator.clipboard.writeText(code);
+    showToast('Data code copied!', 'success');
+    return true;
+  } catch (e) {
+    // Fallback for older browsers
+    const textArea = document.createElement('textarea');
+    textArea.value = code;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    showToast('Data code copied!', 'success');
+    return true;
+  }
+}
+
+/**
  * Creates an empty week data structure
  * @returns {Object} Empty week with all days initialized
  */

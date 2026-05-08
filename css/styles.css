@@ -799,6 +799,121 @@ body {
   letter-spacing: 2px;
 }
 
+/* Device Link Section */
+.device-link-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border);
+}
+
+.device-link-divider {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.device-link-divider span {
+  font-size: 0.72rem;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.device-link-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.device-link-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+}
+
+.device-link-btn:hover {
+  background: var(--surface2);
+  border-color: var(--border2);
+  color: var(--text);
+}
+
+.device-link-btn.export {
+  background: var(--green-light);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.device-link-btn.export:hover {
+  background: #b8e0cc;
+}
+
+.device-link-btn.import {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text2);
+}
+
+.device-link-btn.import:hover {
+  background: var(--gold-light);
+  border-color: #d4b655;
+  color: #7A5E1A;
+}
+
+.device-link-help {
+  margin-top: 10px;
+  font-size: 0.68rem;
+  color: var(--text3);
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* Import Modal */
+.import-modal {
+  max-width: 400px;
+}
+
+.import-textarea {
+  width: 100%;
+  height: 100px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  resize: none;
+  margin: 12px 0;
+  background: var(--bg);
+}
+
+.import-textarea:focus {
+  outline: none;
+  border-color: var(--green);
+}
+
+.import-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--gold-light);
+  border: 1px solid #d4b655;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  color: #7A5E1A;
+  margin-bottom: 16px;
+}
+
 /* TOAST */
 .toast-container {
   position: fixed;
