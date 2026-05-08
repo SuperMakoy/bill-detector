@@ -1089,3 +1089,13 @@ body {
 /* spacing utility */
 .mt-12 { margin-top: 12px; }
 .gap-col { display: flex; flex-direction: column; gap: 16px; }
+
+/* PRINT STYLES */
+@media print {
+  * { background: transparent !important; color: #000 !important; box-shadow: none !important; text-shadow: none !important; }
+  body { background: white !important; color: black !important; margin: 0; padding: 0; }
+  .app { display: none !important; }
+  .sidebar, .topbar, .main, .bottom-nav { display: none !important; }
+  #print-receipt { display: block !important; width: 100%; }
+  @page { size: 80mm 200mm; margin: 0; }
+}
