@@ -4,7 +4,7 @@
  */
 
 // ONNX Model Configuration
-const ONNX_MODEL_PATH = 'model/bill_detector.onnx';
+const ONNX_MODEL_PATH = 'model/best.onnx';
 const CONFIDENCE = 0.5;
 
 // Days of the week
