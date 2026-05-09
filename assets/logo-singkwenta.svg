@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320">
+  <style>
+    .sk-s { font-family: 'Georgia', serif; font-size: 220px; font-weight: 700; fill: #D42B2B; }
+    .sk-k { font-family: 'Georgia', serif; font-size: 220px; font-weight: 700; fill: #A01E1E; }
+  </style>
+  <text x="210" y="268" class="sk-k">K</text>
+  <text x="55" y="268" class="sk-s" transform="rotate(-8, 140, 180)">S</text>
+  <line x1="38" y1="148" x2="218" y2="148" stroke="#F5C842" stroke-width="6" stroke-linecap="round"/>
+  <line x1="38" y1="172" x2="218" y2="172" stroke="#F5C842" stroke-width="6" stroke-linecap="round"/>
+</svg>
