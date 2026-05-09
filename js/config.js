@@ -1,11 +1,10 @@
 /**
  * PiptiPipti - Configuration
- * API keys and application constants
+ * ONNX model path and application constants
  */
 
-// Roboflow API Configuration
-const API_KEY = "ywviB9Noif9D8XXpb2i5";
-const MODEL_ID = "50-peso-bill-detectorv2/4";
+// ONNX Model Configuration
+const ONNX_MODEL_PATH = 'model/bill_detector.onnx';
 const CONFIDENCE = 0.5;
 
 // Days of the week
