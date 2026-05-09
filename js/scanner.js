@@ -146,7 +146,7 @@ function retake() {
 
 /**
  * Preprocesses image for ONNX model input
- * Resizes and normalizes image to model input size
+ * Resizes and normalizes image to model input size (704x704)
  * @param {HTMLImageElement} img - Image element to preprocess
  * @returns {Float32Array} Normalized image data
  */
@@ -154,23 +154,24 @@ function preprocessImage(img) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   
-  // Model expects 640x640 input
-  canvas.width = 640;
-  canvas.height = 640;
+  // Model expects 704x704 input
+  const INPUT_SIZE = 704;
+  canvas.width = INPUT_SIZE;
+  canvas.height = INPUT_SIZE;
   
   // Draw image centered, maintaining aspect ratio
   const scale = Math.min(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight);
   const x = (canvas.width - img.naturalWidth * scale) / 2;
   const y = (canvas.height - img.naturalHeight * scale) / 2;
   
-  ctx.fillStyle = '#128'; // Pad with gray
+  ctx.fillStyle = '#808080'; // Pad with gray
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(img, x, y, img.naturalWidth * scale, img.naturalHeight * scale);
   
   // Get pixel data and normalize to [0, 1]
-  const imageData = ctx.getImageData(0, 0, 640, 640);
+  const imageData = ctx.getImageData(0, 0, INPUT_SIZE, INPUT_SIZE);
   const data = imageData.data;
-  const normalized = new Float32Array(640 * 640 * 3);
+  const normalized = new Float32Array(INPUT_SIZE * INPUT_SIZE * 3);
   
   for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
     normalized[j] = data[i] / 255;     // R
@@ -190,51 +191,66 @@ function preprocessImage(img) {
  */
 function postprocessOutputs(outputs, imgWidth, imgHeight) {
   // ONNX YOLOv8 output format:
-  // outputs: [1, 84, 8400] or similar depending on model
-  // Format: [x, y, w, h, obj_conf, class0_conf, class1_conf, ...]
+  // outputs: [1, num_classes + 4, num_anchors]
+  // For this model: [1, 7, num_anchors] where 7 = 4 coords + 3 classes
+  // Format: [x, y, w, h, new_50_conf, not_bill_conf, old_50_conf]
   
   const detections = [];
+  const INPUT_SIZE = 704;
   
-  // Get output tensor
-  const output = outputs[Object.keys(outputs)[0]];
+  // Get output tensor - usually the first and only output
+  const outputKey = Object.keys(outputs)[0];
+  const output = outputs[outputKey];
   const data = output.data;
   
-  // Typically 8400 predictions
-  const numPredictions = data.length / 84; // 4 coords + 1 obj + 79 classes for COCO
+  console.log('[ONNX] Output shape:', output.dims, 'Data length:', data.length);
+  
+  // Calculate stride based on output shape
+  // YOLOv8 output is typically [1, 7, 8400] for this model
+  const numClasses = 3;
+  const coordsPerPred = 4; // x, y, w, h
+  const valuesPerPred = coordsPerPred + numClasses; // 4 + 3 = 7
+  const numPredictions = data.length / valuesPerPred;
+  
+  console.log('[ONNX] Processing', numPredictions, 'predictions');
   
   for (let i = 0; i < numPredictions; i++) {
-    const idx = i * 84;
+    const idx = i * valuesPerPred;
     
-    // YOLO format: x_center, y_center, width, height, objectness, ...class_probs
+    // YOLO format: x_center, y_center, width, height, class_probs...
     const x_center = data[idx];
     const y_center = data[idx + 1];
     const w = data[idx + 2];
     const h = data[idx + 3];
-    const objConf = data[idx + 4];
     
-    // Check objectness threshold
-    if (objConf < CONFIDENCE) continue;
+    // Class confidences (order: new_50, not_bill, old_50)
+    const conf_new50 = data[idx + 4];
+    const conf_notbill = data[idx + 5];
+    const conf_old50 = data[idx + 6];
     
-    // Find class with highest confidence (skip first 5 values: x,y,w,h,obj)
-    let maxClassConf = 0;
+    // Find the class with highest confidence
+    const maxConf = Math.max(conf_new50, conf_notbill, conf_old50);
+    
+    // Check confidence threshold
+    if (maxConf < CONFIDENCE) continue;
+    
+    // Determine class
     let classIdx = 0;
-    for (let c = 5; c < 84; c++) {
-      if (data[idx + c] > maxClassConf) {
-        maxClassConf = data[idx + c];
-        classIdx = c - 5;
-      }
-    }
+    if (conf_notbill > conf_new50 && conf_notbill > conf_old50) classIdx = 1;
+    else if (conf_old50 > conf_new50 && conf_old50 > conf_notbill) classIdx = 2;
     
-    // Classes: 0=old_50, 1=new_50, 2=not_bill
-    const classes = ['old_50', 'new_50', 'not_bill'];
-    const className = classes[classIdx] || 'unknown';
+    const classes = ['new_50', 'not_bill', 'old_50'];
+    const className = classes[classIdx];
     
     // Scale coordinates back to original image size
-    const scale = Math.min(640 / imgWidth, 640 / imgHeight);
-    const scaledX = (x_center / scale);
-    const scaledY = (y_center / scale);
-    const scaledW = (w / scale);
-    const scaledH = (h / scale);
+    // The model was trained on 704x704, need to scale back to original
+    const scaleX = imgWidth / INPUT_SIZE;
+    const scaleY = imgHeight / INPUT_SIZE;
+    
+    const scaledX = x_center * scaleX;
+    const scaledY = y_center * scaleY;
+    const scaledW = w * scaleX;
+    const scaledH = h * scaleY;
     
     detections.push({
       x: scaledX,
@@ -242,10 +258,11 @@ function postprocessOutputs(outputs, imgWidth, imgHeight) {
       width: scaledW,
       height: scaledH,
       class: className,
-      confidence: objConf * maxClassConf // Combined confidence
+      confidence: maxConf
     });
   }
   
+  console.log('[ONNX] Found', detections.length, 'detections');
   return detections;
 }
 
@@ -277,11 +294,19 @@ async function detect() {
     console.log('[ONNX] Preprocessing image...');
     const imageData = preprocessImage(preview);
     
-    // Create input tensor
-    const tensor = new ort.Tensor('float32', imageData, [1, 3, 640, 640]);
+    // Create input tensor (704x704)
+    const INPUT_SIZE = 704;
+    const tensor = new ort.Tensor('float32', imageData, [1, 3, INPUT_SIZE, INPUT_SIZE]);
     
     console.log('[ONNX] Running inference...');
-    const outputs = await session.run({ images: tensor });
+    // Try common input names - the model might use 'images' or 'input'
+    let outputs;
+    try {
+      outputs = await session.run({ images: tensor });
+    } catch (e) {
+      console.log('[ONNX] "images" failed, trying "input"...');
+      outputs = await session.run({ input: tensor });
+    }
     
     console.log('[ONNX] Postprocessing outputs...');
     const detections = postprocessOutputs(outputs, imgWidth, imgHeight);
