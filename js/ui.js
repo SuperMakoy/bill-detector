@@ -88,6 +88,71 @@ function showResult(type, main, sub, tags) {
 }
 
 /**
+ * Shows a model loading banner below the topbar
+ * Disappears automatically when model is ready
+ */
+function showModelLoadingBanner() {
+  // Don't show if already exists
+  if (document.getElementById('modelLoadingBanner')) return;
+
+  const banner = document.createElement('div');
+  banner.id = 'modelLoadingBanner';
+  banner.innerHTML = `
+    <div class="model-banner-spinner"></div>
+    <span>Loading AI model — first scan may take up to 1 minute on mobile...</span>
+  `;
+  banner.style.cssText = `
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    background: #F5EDD5;
+    border-bottom: 1px solid #E8D499;
+    color: #7A5E1A;
+    font-size: 0.78rem;
+    font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    position: sticky;
+    top: 0;
+    z-index: 9;
+    grid-column: 2;
+  `;
+
+  // Add spinner style
+  const style = document.createElement('style');
+  style.textContent = `
+    .model-banner-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid #E8D499;
+      border-top-color: #7A5E1A;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Insert after topbar inside .app
+  const topbar = document.querySelector('.topbar');
+  if (topbar && topbar.nextSibling) {
+    topbar.parentNode.insertBefore(banner, topbar.nextSibling);
+  }
+}
+
+/**
+ * Hides the model loading banner
+ */
+function hideModelLoadingBanner() {
+  const banner = document.getElementById('modelLoadingBanner');
+  if (banner) {
+    banner.style.transition = 'opacity 0.4s ease';
+    banner.style.opacity = '0';
+    setTimeout(() => banner.remove(), 400);
+  }
+}
+
+/**
  * Generates a unique receipt ID based on date and time
  */
 function generateReceiptId() {
@@ -101,7 +166,6 @@ function generateReceiptId() {
  * Generates a hash string for the receipt (low opacity identifier)
  */
 function generateReceiptHash() {
-  const now = new Date();
   const hash = Math.random().toString(36).substring(2, 15) + 
                Math.random().toString(36).substring(2, 15);
   return hash.toUpperCase().substring(0, 16);
@@ -187,12 +251,10 @@ function downloadReportImage() {
   const now = new Date();
   const dateStr = now.toISOString().split('T')[0];
 
-  // Wait for images to load
   const imgs = container.querySelectorAll('img');
   let loadedCount = 0;
   
   const performDownload = () => {
-    // Use html2canvas if available
     if (typeof html2canvas !== 'undefined') {
       html2canvas(container, { 
         scale: 2, 
@@ -221,7 +283,6 @@ function downloadReportImage() {
   if (imgs.length === 0) {
     performDownload();
   } else {
-    // Wait for all images to load
     imgs.forEach(img => {
       img.style.maxWidth = '100%';
       img.style.display = 'block';

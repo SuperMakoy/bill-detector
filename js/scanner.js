@@ -1,15 +1,23 @@
 /**
  * PiptiPipti - Bill Scanner with ONNX Runtime
- * YOLOv8m model: HWC tensor input, pixel-space cx/cy/w/h output, NMS required
+ * YOLOv8s model: CHW tensor input, pixel-space cx/cy/w/h output, NMS required
  */
 
 let currentFile = null;
 let session = null;
+let modelReady = false;
 
 async function loadModel() {
   try {
     if (session) return;
     console.log('[ONNX] Fetching model from:', ONNX_MODEL_PATH);
+
+    // Update scan button to show loading state
+    const scanBtn = document.getElementById('scanBtn');
+    if (scanBtn) {
+      scanBtn.textContent = 'Loading AI model...';
+      scanBtn.disabled = true;
+    }
 
     const response = await fetch(ONNX_MODEL_PATH);
     if (!response.ok) throw new Error(`HTTP ${response.status} — could not fetch model file. Check that model/best.onnx exists.`);
@@ -21,10 +29,6 @@ async function loadModel() {
       throw new Error('Model file is too small — it may not have been copied correctly.');
     }
 
-    // Your model uses fp16 weights with Cast(fp32->fp16) at the input and
-    // Cast(fp16->fp32) at the output. onnxruntime-web WASM 1.18 cannot run
-    // fp16 ops and silently hangs. Fix: enable the fp16 emulation flag
-    // added in ort 1.19+ AND upgrade the CDN script in index.html.
     ort.env.wasm.numThreads = 1;
     ort.env.wasm.simd = true;
 
@@ -34,20 +38,45 @@ async function loadModel() {
       executionMode: 'sequential',
     };
 
-    // Timeout so we get a real error instead of hanging forever
-    const timeoutMs = 90000;
+    const timeoutMs = 120000;
     const sessionPromise = ort.InferenceSession.create(arrayBuffer, sessionOptions);
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error(
-        'Model load timed out (90s). ' +
-        'Make sure index.html uses onnxruntime-web 1.21.0 (see comment in this file).'
+        'Model load timed out (120s). Make sure index.html uses onnxruntime-web 1.21.0.'
       )), timeoutMs)
     );
 
     session = await Promise.race([sessionPromise, timeoutPromise]);
+    modelReady = true;
+
     console.log('[ONNX] Model loaded. Inputs:', session.inputNames, 'Outputs:', session.outputNames);
+
+    // Update button state now that model is ready
+    if (scanBtn && currentFile) {
+      scanBtn.textContent = 'Detect Bills';
+      scanBtn.disabled = false;
+    } else if (scanBtn) {
+      scanBtn.textContent = 'Detect Bills';
+      // Keep disabled until image is loaded
+    }
+
+    showToast('AI model ready!', 'success');
+
   } catch (err) {
     console.error('[ONNX] Failed to load model:', err);
+    modelReady = false;
+
+    const scanBtn = document.getElementById('scanBtn');
+    if (scanBtn) {
+      scanBtn.textContent = 'Model failed — Tap to retry';
+      scanBtn.disabled = false;
+      scanBtn.onclick = () => {
+        session = null;
+        loadModel();
+      };
+    }
+
+    showToast('Model failed to load', 'error');
     throw err;
   }
 }
@@ -99,14 +128,22 @@ function handleFile(e) {
   const preview = document.getElementById('preview');
   preview.onload = () => {
     const canvas = document.getElementById('boxCanvas');
-    canvas.width = preview.naturalWidth;
-    canvas.height = preview.naturalHeight;
     canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
   };
   preview.src = URL.createObjectURL(file);
   document.getElementById('previewWrap').style.display = 'block';
   document.getElementById('captureOptions').style.display = 'none';
-  document.getElementById('scanBtn').disabled = false;
+
+  // Only enable detect button if model is ready
+  const scanBtn = document.getElementById('scanBtn');
+  if (modelReady) {
+    scanBtn.disabled = false;
+    scanBtn.textContent = 'Detect Bills';
+  } else {
+    scanBtn.disabled = true;
+    scanBtn.textContent = 'Loading AI model...';
+  }
+
   document.getElementById('retakeBtn').style.display = 'block';
   document.getElementById('resultBox').style.display = 'none';
 }
@@ -118,19 +155,17 @@ function retake() {
   document.getElementById('previewWrap').style.display = 'none';
   document.getElementById('captureOptions').style.display = 'flex';
   document.getElementById('scanBtn').disabled = true;
+  document.getElementById('scanBtn').textContent = 'Detect Bills';
   document.getElementById('retakeBtn').style.display = 'none';
   document.getElementById('resultBox').style.display = 'none';
   document.getElementById('loader').style.display = 'none';
-  document.getElementById('boxCanvas').getContext('2d').clearRect(0, 0, 9999, 9999);
+  const canvas = document.getElementById('boxCanvas');
+  canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
 }
 
 /**
  * Preprocesses image for YOLOv8 ONNX input.
- *
- * YOLOv8 ONNX (exported via ultralytics) expects:
- *   - Shape: [1, 3, H, W]  (CHW, NOT HWC)
- *   - Values: float32 in [0, 1]
- *   - Letterboxed with gray (114,114,114) padding
+ * Shape: [1, 3, H, W] (CHW), float32 in [0,1], letterboxed with gray (114,114,114)
  */
 function preprocessImage(img) {
   const INPUT_SIZE = 704;
@@ -199,7 +234,6 @@ function postprocessOutputs(outputs, imgWidth, imgHeight, scale, padX, padY, INP
   const data = output.data;
 
   console.log('[ONNX] Output key:', outputKey, 'Shape:', output.dims);
-  console.log('[ONNX] First 14 values:', Array.from(data.slice(0, 14)).map(v => v.toFixed(4)));
 
   if (!data || data.length === 0) return [];
 
@@ -219,8 +253,6 @@ function postprocessOutputs(outputs, imgWidth, imgHeight, scale, padX, padY, INP
     console.error('[ONNX] Unexpected output dims:', output.dims);
     return [];
   }
-
-  console.log('[ONNX] numPreds:', numPreds, 'numValues:', numValues);
 
   const classes = ['new_50', 'not_bill', 'old_50'];
   const detections = [];
@@ -270,8 +302,6 @@ function postprocessOutputs(outputs, imgWidth, imgHeight, scale, padX, padY, INP
     detections.push({ x1, y1, x2, y2, class: classes[classIdx], confidence: maxConf });
   }
 
-  console.log('[ONNX]', detections.length, 'detections above threshold (CONFIDENCE =', CONFIDENCE + ')');
-
   const afterNMS = applyNMS(detections, 0.45);
   console.log('[ONNX]', afterNMS.length, 'detections after NMS');
 
@@ -294,19 +324,19 @@ async function detect() {
   resultBox.style.display = 'none';
 
   try {
-    await loadModel();
+    // If model isn't ready yet, load it now (fallback)
+    if (!modelReady) {
+      await loadModel();
+    }
 
     const preview   = document.getElementById('preview');
     const imgWidth  = preview.naturalWidth;
     const imgHeight = preview.naturalHeight;
-    console.log('[ONNX] Original image size:', imgWidth, 'x', imgHeight);
 
     const { tensor, scale, padX, padY, INPUT_SIZE } = preprocessImage(preview);
-    console.log('[ONNX] Letterbox: scale=', scale.toFixed(4), 'padX=', padX, 'padY=', padY);
 
     const inputTensor = new ort.Tensor('float32', tensor, [1, 3, INPUT_SIZE, INPUT_SIZE]);
     const inputName   = session.inputNames[0];
-    console.log('[ONNX] Running inference, input name:', inputName);
 
     const outputs = await session.run({ [inputName]: inputTensor });
 
@@ -322,6 +352,7 @@ async function detect() {
   } finally {
     loader.style.display = 'none';
     scanBtn.disabled = false;
+    scanBtn.textContent = 'Detect Bills';
   }
 }
 
@@ -363,29 +394,69 @@ function processDetections(preds, imgWidth, imgHeight) {
   showToast(`Added ₱${total}`, 'success');
 }
 
+/**
+ * Draws bounding boxes correctly accounting for object-fit: contain black bars.
+ * The <img> element may have black bars (letterbox/pillarbox) because the image
+ * aspect ratio doesn't match the element's aspect ratio. We must calculate the
+ * actual rendered image area inside the element and offset boxes accordingly.
+ */
 function drawBoxes(bills, imgWidth, imgHeight) {
-  const canvas = document.getElementById('boxCanvas');
-  const ctx    = canvas.getContext('2d');
-  canvas.width  = imgWidth;
-  canvas.height = imgHeight;
-  ctx.clearRect(0, 0, imgWidth, imgHeight);
+  const canvas  = document.getElementById('boxCanvas');
+  const preview = document.getElementById('preview');
+  const ctx     = canvas.getContext('2d');
+
+  const displayWidth  = preview.clientWidth;
+  const displayHeight = preview.clientHeight;
+
+  canvas.width  = displayWidth;
+  canvas.height = displayHeight;
+  ctx.clearRect(0, 0, displayWidth, displayHeight);
+
+  // Calculate actual rendered image rect inside object-fit: contain element
+  const imageAspect   = imgWidth / imgHeight;
+  const elementAspect = displayWidth / displayHeight;
+
+  let renderedW, renderedH, offsetX, offsetY;
+
+  if (imageAspect > elementAspect) {
+    // Image is wider than element → black bars on top & bottom
+    renderedW = displayWidth;
+    renderedH = displayWidth / imageAspect;
+    offsetX   = 0;
+    offsetY   = (displayHeight - renderedH) / 2;
+  } else {
+    // Image is taller than element → black bars on left & right
+    renderedH = displayHeight;
+    renderedW = displayHeight * imageAspect;
+    offsetX   = (displayWidth - renderedW) / 2;
+    offsetY   = 0;
+  }
+
+  // Scale from natural image coords to rendered image coords
+  const scaleX = renderedW / imgWidth;
+  const scaleY = renderedH / imgHeight;
 
   bills.forEach(bill => {
-    const w     = bill.x2 - bill.x1;
-    const h     = bill.y2 - bill.y1;
+    const x1 = offsetX + bill.x1 * scaleX;
+    const y1 = offsetY + bill.y1 * scaleY;
+    const x2 = offsetX + bill.x2 * scaleX;
+    const y2 = offsetY + bill.y2 * scaleY;
+    const w  = x2 - x1;
+    const h  = y2 - y1;
+
     const isOld = bill.class === 'old_50';
     const color = isOld ? '#C9A84C' : '#2D6A4F';
 
     ctx.strokeStyle = color;
     ctx.lineWidth   = 2.5;
-    ctx.strokeRect(bill.x1, bill.y1, w, h);
+    ctx.strokeRect(x1, y1, w, h);
 
     const label = `${isOld ? 'Old' : 'New'} ₱50 · ${Math.round(bill.confidence * 100)}%`;
     ctx.font = 'bold 13px DM Sans, sans-serif';
     const tw = ctx.measureText(label).width;
     ctx.fillStyle = color;
-    ctx.fillRect(bill.x1, bill.y1 - 24, tw + 14, 24);
+    ctx.fillRect(x1, y1 - 24, tw + 14, 24);
     ctx.fillStyle = '#fff';
-    ctx.fillText(label, bill.x1 + 7, bill.y1 - 7);
+    ctx.fillText(label, x1 + 7, y1 - 7);
   });
 }
