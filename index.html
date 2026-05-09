@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="css/styles.css"/>
   
   <!-- ONNX Runtime for local model inference -->
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js"></script>
   
   <!-- html2canvas for image export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -258,7 +258,7 @@
     <!-- SETTINGS VIEW -->
     <div class="view" id="view-settings">
       <div class="settings-grid">
-        <!-- Device Info Card - First so users see it prominently -->
+        <!-- Device Info Card -->
         <div class="setting-card device-card">
           <div class="device-header">
             <span id="deviceIconDisplay"></span>
@@ -271,12 +271,10 @@
             Your data is tied to this device only. Different phones or browsers will have their own separate data.
           </div>
           
-          <!-- Link Device Section -->
           <div class="device-link-section">
             <div class="device-link-divider">
               <span>Sync with another device</span>
             </div>
-            
             <div class="device-link-buttons">
               <button class="device-link-btn export" onclick="copyDataToClipboard()">
                 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
@@ -287,7 +285,6 @@
                 Import Data
               </button>
             </div>
-            
             <div class="device-link-help">
               To sync: Copy data from one device, then Import on another.
             </div>
@@ -389,6 +386,19 @@
 <script src="js/views.js"></script>
 <script src="js/modal.js"></script>
 <script src="js/main.js"></script>
+
+<!-- COI Service Worker: fixes SharedArrayBuffer for onnxruntime-web WASM on Live Server -->
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./coi-serviceworker.js').then(reg => {
+      if (!navigator.serviceWorker.controller) {
+        reg.installing?.addEventListener('statechange', e => {
+          if (e.target.state === 'activated') location.reload();
+        });
+      }
+    });
+  }
+</script>
 
 </body>
 </html>

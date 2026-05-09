@@ -9,10 +9,42 @@ let session = null;
 async function loadModel() {
   try {
     if (session) return;
-    console.log('[ONNX] Loading model from:', ONNX_MODEL_PATH);
-    session = await ort.InferenceSession.create(ONNX_MODEL_PATH, {
-      executionProviders: ['wasm']
-    });
+    console.log('[ONNX] Fetching model from:', ONNX_MODEL_PATH);
+
+    const response = await fetch(ONNX_MODEL_PATH);
+    if (!response.ok) throw new Error(`HTTP ${response.status} — could not fetch model file. Check that model/best.onnx exists.`);
+
+    const arrayBuffer = await response.arrayBuffer();
+    console.log('[ONNX] Model fetched, size:', arrayBuffer.byteLength, 'bytes');
+
+    if (arrayBuffer.byteLength < 1000) {
+      throw new Error('Model file is too small — it may not have been copied correctly.');
+    }
+
+    // Your model uses fp16 weights with Cast(fp32->fp16) at the input and
+    // Cast(fp16->fp32) at the output. onnxruntime-web WASM 1.18 cannot run
+    // fp16 ops and silently hangs. Fix: enable the fp16 emulation flag
+    // added in ort 1.19+ AND upgrade the CDN script in index.html.
+    ort.env.wasm.numThreads = 1;
+    ort.env.wasm.simd = true;
+
+    const sessionOptions = {
+      executionProviders: ['wasm'],
+      graphOptimizationLevel: 'all',
+      executionMode: 'sequential',
+    };
+
+    // Timeout so we get a real error instead of hanging forever
+    const timeoutMs = 90000;
+    const sessionPromise = ort.InferenceSession.create(arrayBuffer, sessionOptions);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(
+        'Model load timed out (90s). ' +
+        'Make sure index.html uses onnxruntime-web 1.21.0 (see comment in this file).'
+      )), timeoutMs)
+    );
+
+    session = await Promise.race([sessionPromise, timeoutPromise]);
     console.log('[ONNX] Model loaded. Inputs:', session.inputNames, 'Outputs:', session.outputNames);
   } catch (err) {
     console.error('[ONNX] Failed to load model:', err);
@@ -99,9 +131,6 @@ function retake() {
  *   - Shape: [1, 3, H, W]  (CHW, NOT HWC)
  *   - Values: float32 in [0, 1]
  *   - Letterboxed with gray (114,114,114) padding
- *
- * Note: despite YOLOv8 training in HWC internally, the ONNX export
- * transposes to CHW. The standard ultralytics export always produces CHW.
  */
 function preprocessImage(img) {
   const INPUT_SIZE = 704;
@@ -110,14 +139,12 @@ function preprocessImage(img) {
   canvas.width = INPUT_SIZE;
   canvas.height = INPUT_SIZE;
 
-  // Letterbox: scale image to fit inside INPUT_SIZE x INPUT_SIZE, pad remainder
   const scale = Math.min(INPUT_SIZE / img.naturalWidth, INPUT_SIZE / img.naturalHeight);
   const scaledW = Math.round(img.naturalWidth  * scale);
   const scaledH = Math.round(img.naturalHeight * scale);
   const padX = Math.floor((INPUT_SIZE - scaledW) / 2);
   const padY = Math.floor((INPUT_SIZE - scaledH) / 2);
 
-  // YOLOv8 uses gray (114,114,114) for letterbox padding
   ctx.fillStyle = 'rgb(114,114,114)';
   ctx.fillRect(0, 0, INPUT_SIZE, INPUT_SIZE);
   ctx.drawImage(img, padX, padY, scaledW, scaledH);
@@ -125,12 +152,11 @@ function preprocessImage(img) {
   const { data } = ctx.getImageData(0, 0, INPUT_SIZE, INPUT_SIZE);
   const stride = INPUT_SIZE * INPUT_SIZE;
 
-  // CHW layout: all R, then all G, then all B — normalized to [0,1]
   const tensor = new Float32Array(3 * stride);
   for (let i = 0; i < stride; i++) {
-    tensor[i]            = data[i * 4]     / 255; // R plane
-    tensor[stride + i]   = data[i * 4 + 1] / 255; // G plane
-    tensor[stride*2 + i] = data[i * 4 + 2] / 255; // B plane
+    tensor[i]            = data[i * 4]     / 255;
+    tensor[stride + i]   = data[i * 4 + 1] / 255;
+    tensor[stride*2 + i] = data[i * 4 + 2] / 255;
   }
 
   return { tensor, scale, padX, padY, INPUT_SIZE };
@@ -150,8 +176,7 @@ function iou(a, b) {
 }
 
 /**
- * Non-Maximum Suppression — removes overlapping duplicate boxes.
- * Sorted by confidence descending; keeps highest, drops any that overlap it.
+ * Non-Maximum Suppression
  */
 function applyNMS(detections, iouThreshold = 0.45) {
   const sorted = [...detections].sort((a, b) => b.confidence - a.confidence);
@@ -167,14 +192,6 @@ function applyNMS(detections, iouThreshold = 0.45) {
 
 /**
  * Postprocesses YOLOv8 ONNX output into detections on the original image.
- *
- * YOLOv8 output layout (after ultralytics ONNX export):
- *   Shape: [1, num_values, num_predictions]  e.g. [1, 7, 8400]
- *   Values: cx, cy, w, h in PIXEL coords of the 704x704 letterboxed image,
- *           followed by per-class confidence scores (already max-reduced,
- *           no separate objectness score in v8).
- *
- * Class order matches training: index 0=new_50, 1=not_bill, 2=old_50
  */
 function postprocessOutputs(outputs, imgWidth, imgHeight, scale, padX, padY, INPUT_SIZE) {
   const outputKey = Object.keys(outputs)[0];
@@ -186,23 +203,17 @@ function postprocessOutputs(outputs, imgWidth, imgHeight, scale, padX, padY, INP
 
   if (!data || data.length === 0) return [];
 
-  // YOLOv8 ONNX is always [1, num_values, num_predictions] — transposed layout
-  // e.g. [1, 7, 8400]: row 0 = all cx, row 1 = all cy, row 2 = all w, row 3 = all h,
-  //                     row 4 = conf_new50, row 5 = conf_notbill, row 6 = conf_old50
   let numPreds, numValues;
   if (output.dims.length === 3) {
     const [, d1, d2] = output.dims;
-    // d1=7 (values), d2=8400 (predictions) — transposed
     if (d1 < d2) {
       numValues = d1;
       numPreds  = d2;
     } else {
-      // Unlikely for yolov8 onnx but handle [1, 8400, 7] just in case
       numValues = d2;
       numPreds  = d1;
     }
   } else if (output.dims.length === 2) {
-    // [8400, 7]
     [numPreds, numValues] = output.dims;
   } else {
     console.error('[ONNX] Unexpected output dims:', output.dims);
@@ -213,14 +224,12 @@ function postprocessOutputs(outputs, imgWidth, imgHeight, scale, padX, padY, INP
 
   const classes = ['new_50', 'not_bill', 'old_50'];
   const detections = [];
-
   const isTransposed = output.dims.length === 3 && output.dims[1] < output.dims[2];
 
   for (let i = 0; i < numPreds; i++) {
     let cx, cy, w, h, conf_new50, conf_notbill, conf_old50;
 
     if (isTransposed) {
-      // [1, num_values, num_preds]: value j for pred i = data[j * numPreds + i]
       cx           = data[0 * numPreds + i];
       cy           = data[1 * numPreds + i];
       w            = data[2 * numPreds + i];
@@ -229,7 +238,6 @@ function postprocessOutputs(outputs, imgWidth, imgHeight, scale, padX, padY, INP
       conf_notbill = data[5 * numPreds + i];
       conf_old50   = data[6 * numPreds + i];
     } else {
-      // [num_preds, num_values] or [1, num_preds, num_values]
       const b = i * numValues;
       cx           = data[b];
       cy           = data[b + 1];
@@ -243,13 +251,10 @@ function postprocessOutputs(outputs, imgWidth, imgHeight, scale, padX, padY, INP
     const maxConf = Math.max(conf_new50, conf_notbill, conf_old50);
     if (maxConf < CONFIDENCE) continue;
 
-    // Class with highest score
     let classIdx = 0;
     if (conf_notbill >= conf_new50 && conf_notbill >= conf_old50) classIdx = 1;
     else if (conf_old50 >= conf_new50 && conf_old50 >= conf_notbill) classIdx = 2;
 
-    // cx,cy,w,h are in the 704x704 letterboxed pixel space.
-    // Remove padding offset, then divide by scale to get original image coords.
     const cx_orig = (cx - padX) / scale;
     const cy_orig = (cy - padY) / scale;
     const w_orig  = w / scale;
