@@ -226,29 +226,33 @@ function postprocessOutputs(outputs, imgWidth, imgHeight) {
     
     // If rows is small (like 7 for coords+classes), it's transposed
     if (rows < 100) {
-      // Format: [1, 7, N] - need to iterate through N predictions
+      // Format: [1, 7, N] - transposed format
+      // Flattened as: [x0, y0, w0, h0, conf_new50_0, conf_notbill_0, conf_old50_0, x1, y1, ...]
       for (let i = 0; i < cols; i++) {
+        const baseIdx = i * rows;
         predictions.push({
-          x: data[i * rows + 0],
-          y: data[i * rows + 1],
-          w: data[i * rows + 2],
-          h: data[i * rows + 3],
-          conf_new50: data[i * rows + 4],
-          conf_notbill: data[i * rows + 5],
-          conf_old50: data[i * rows + 6]
+          x: data[baseIdx + 0],
+          y: data[baseIdx + 1],
+          w: data[baseIdx + 2],
+          h: data[baseIdx + 3],
+          conf_new50: data[baseIdx + 4],
+          conf_notbill: data[baseIdx + 5],
+          conf_old50: data[baseIdx + 6]
         });
       }
     } else {
       // Format: [1, N, 7] - standard format
+      // Flattened as: [x0, y0, w0, h0, conf_new50_0, conf_notbill_0, conf_old50_0, x1, y1, ...]
       for (let i = 0; i < rows; i++) {
+        const baseIdx = i * cols;
         predictions.push({
-          x: data[i * cols + 0],
-          y: data[i * cols + 1],
-          w: data[i * cols + 2],
-          h: data[i * cols + 3],
-          conf_new50: data[i * cols + 4],
-          conf_notbill: data[i * cols + 5],
-          conf_old50: data[i * cols + 6]
+          x: data[baseIdx + 0],
+          y: data[baseIdx + 1],
+          w: data[baseIdx + 2],
+          h: data[baseIdx + 3],
+          conf_new50: data[baseIdx + 4],
+          conf_notbill: data[baseIdx + 5],
+          conf_old50: data[baseIdx + 6]
         });
       }
     }
@@ -269,11 +273,14 @@ function postprocessOutputs(outputs, imgWidth, imgHeight) {
   }
   
   console.log('[ONNX] Parsed', predictions.length, 'predictions');
+  console.log('[ONNX] First 3 predictions:', predictions.slice(0, 3));
   
   // Process predictions
   for (let pred of predictions) {
     // Find the class with highest confidence
     const maxConf = Math.max(pred.conf_new50, pred.conf_notbill, pred.conf_old50);
+    
+    console.log('[ONNX] Processing pred - maxConf:', maxConf, 'threshold:', CONFIDENCE, 'passed:', maxConf >= CONFIDENCE);
     
     // Check confidence threshold
     if (maxConf < CONFIDENCE) continue;
