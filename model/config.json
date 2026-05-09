@@ -1,0 +1,17 @@
+{
+  "model_name": "peso_bill_v2_medium",
+  "img_size": 704,
+  "num_classes": 3,
+  "class_names": [
+    "new_50",
+    "not_bill",
+    "old_50"
+  ],
+  "conf_threshold": 0.4,
+  "iou_threshold": 0.45,
+  "class_colors": {
+    "new_50": "#22c55e",
+    "old_50": "#f59e0b",
+    "not_bill": "#ef4444"
+  }
+}
