@@ -313,7 +313,67 @@ function postprocessOutputs(outputs, imgWidth, imgHeight) {
   }
   
   console.log('[ONNX] Found', detections.length, 'detections above threshold');
-  return detections;
+  
+  // Apply NMS to remove overlapping detections
+  const filtered = nms(detections);
+  console.log('[ONNX] After NMS:', filtered.length, 'detections');
+  
+  return filtered;
+}
+
+/**
+ * Apply Non-Maximum Suppression to remove overlapping detections
+ * @param {Array} detections - Array of detection objects
+ * @param {number} iouThreshold - IoU threshold (default 0.5)
+ * @returns {Array} Filtered detections
+ */
+function nms(detections, iouThreshold = 0.5) {
+  if (detections.length === 0) return [];
+  
+  // Sort by confidence (descending)
+  const sorted = [...detections].sort((a, b) => b.confidence - a.confidence);
+  const kept = [];
+  
+  for (let i = 0; i < sorted.length; i++) {
+    const current = sorted[i];
+    let shouldKeep = true;
+    
+    for (let j = 0; j < kept.length; j++) {
+      const existing = kept[j];
+      
+      // Calculate IoU (Intersection over Union)
+      const x1_min = Math.min(current.x - current.width / 2, existing.x - existing.width / 2);
+      const x1_max = Math.max(current.x - current.width / 2, existing.x - existing.width / 2);
+      const x2_min = Math.min(current.x + current.width / 2, existing.x + existing.width / 2);
+      const x2_max = Math.max(current.x + current.width / 2, existing.x + existing.width / 2);
+      
+      const y1_min = Math.min(current.y - current.height / 2, existing.y - existing.height / 2);
+      const y1_max = Math.max(current.y - current.height / 2, existing.y - existing.height / 2);
+      const y2_min = Math.min(current.y + current.height / 2, existing.y + existing.height / 2);
+      const y2_max = Math.max(current.y + current.height / 2, existing.y + existing.height / 2);
+      
+      const intersectionW = Math.max(0, x2_min - x1_max);
+      const intersectionH = Math.max(0, y2_min - y1_max);
+      const intersection = intersectionW * intersectionH;
+      
+      const area1 = current.width * current.height;
+      const area2 = existing.width * existing.height;
+      const union = area1 + area2 - intersection;
+      
+      const iou = intersection / union;
+      
+      if (iou > iouThreshold) {
+        shouldKeep = false;
+        break;
+      }
+    }
+    
+    if (shouldKeep) {
+      kept.push(current);
+    }
+  }
+  
+  return kept;
 }
 
 /**
