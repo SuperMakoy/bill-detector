@@ -39,6 +39,9 @@ function init() {
   document.getElementById('importModalOverlay').addEventListener('click', function(e) {
     if (e.target === this) closeImportModal();
   });
+  
+  // Preload ONNX model in background (so first scan is fast)
+  loadModel().catch(err => console.warn('Model preload failed:', err));
 }
 
 /**
