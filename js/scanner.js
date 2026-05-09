@@ -21,8 +21,12 @@ async function loadModel() {
       executionProviders: ['wasm']
     });
     console.log('[ONNX] Model loaded successfully');
+    console.log('[ONNX] Input names:', session.inputNames);
+    console.log('[ONNX] Output names:', session.outputNames);
   } catch (err) {
     console.error('[ONNX] Failed to load model:', err);
+    console.error('[ONNX] Error message:', err.message);
+    console.error('[ONNX] Error stack:', err.stack);
     throw err;
   }
 }
@@ -190,11 +194,7 @@ function preprocessImage(img) {
  * @returns {Array} Array of detections with x, y, width, height, class, confidence
  */
 function postprocessOutputs(outputs, imgWidth, imgHeight) {
-  // ONNX YOLOv8 output format:
-  // outputs: [1, num_classes + 4, num_anchors]
-  // For this model: [1, 7, num_anchors] where 7 = 4 coords + 3 classes
-  // Format: [x, y, w, h, new_50_conf, not_bill_conf, old_50_conf]
-  
+  // ONNX YOLOv8 output handling
   const detections = [];
   const INPUT_SIZE = 704;
   
@@ -203,54 +203,91 @@ function postprocessOutputs(outputs, imgWidth, imgHeight) {
   const output = outputs[outputKey];
   const data = output.data;
   
-  console.log('[ONNX] Output shape:', output.dims, 'Data length:', data.length);
+  console.log('[ONNX] Output key:', outputKey);
+  console.log('[ONNX] Output shape:', output.dims);
+  console.log('[ONNX] Data length:', data.length);
+  console.log('[ONNX] First 10 values:', Array.from(data).slice(0, 10));
   
-  // Calculate stride based on output shape
-  // YOLOv8 output is typically [1, 7, 8400] for this model
-  const numClasses = 3;
-  const coordsPerPred = 4; // x, y, w, h
-  const valuesPerPred = coordsPerPred + numClasses; // 4 + 3 = 7
-  const numPredictions = data.length / valuesPerPred;
+  // Handle different output tensor formats
+  let predictions = [];
   
-  console.log('[ONNX] Processing', numPredictions, 'predictions');
+  if (output.dims.length === 3) {
+    // Shape: [1, num_values, num_predictions] - transpose if needed
+    // YOLOv8 typically outputs [1, num_predictions, num_values] after latest versions
+    const [batchSize, rows, cols] = output.dims;
+    
+    console.log('[ONNX] 3D output shape detected:', batchSize, rows, cols);
+    
+    // If rows is small (like 7 for coords+classes), it's transposed
+    if (rows < 100) {
+      // Format: [1, 7, N] - need to iterate through N predictions
+      for (let i = 0; i < cols; i++) {
+        predictions.push({
+          x: data[i * rows + 0],
+          y: data[i * rows + 1],
+          w: data[i * rows + 2],
+          h: data[i * rows + 3],
+          conf_new50: data[i * rows + 4],
+          conf_notbill: data[i * rows + 5],
+          conf_old50: data[i * rows + 6]
+        });
+      }
+    } else {
+      // Format: [1, N, 7] - standard format
+      for (let i = 0; i < rows; i++) {
+        predictions.push({
+          x: data[i * cols + 0],
+          y: data[i * cols + 1],
+          w: data[i * cols + 2],
+          h: data[i * cols + 3],
+          conf_new50: data[i * cols + 4],
+          conf_notbill: data[i * cols + 5],
+          conf_old50: data[i * cols + 6]
+        });
+      }
+    }
+  } else if (output.dims.length === 2) {
+    // Shape: [num_predictions, num_values]
+    const [rows, cols] = output.dims;
+    for (let i = 0; i < rows; i++) {
+      predictions.push({
+        x: data[i * cols + 0],
+        y: data[i * cols + 1],
+        w: data[i * cols + 2],
+        h: data[i * cols + 3],
+        conf_new50: data[i * cols + 4],
+        conf_notbill: data[i * cols + 5],
+        conf_old50: data[i * cols + 6]
+      });
+    }
+  }
   
-  for (let i = 0; i < numPredictions; i++) {
-    const idx = i * valuesPerPred;
-    
-    // YOLO format: x_center, y_center, width, height, class_probs...
-    const x_center = data[idx];
-    const y_center = data[idx + 1];
-    const w = data[idx + 2];
-    const h = data[idx + 3];
-    
-    // Class confidences (order: new_50, not_bill, old_50)
-    const conf_new50 = data[idx + 4];
-    const conf_notbill = data[idx + 5];
-    const conf_old50 = data[idx + 6];
-    
+  console.log('[ONNX] Parsed', predictions.length, 'predictions');
+  
+  // Process predictions
+  for (let pred of predictions) {
     // Find the class with highest confidence
-    const maxConf = Math.max(conf_new50, conf_notbill, conf_old50);
+    const maxConf = Math.max(pred.conf_new50, pred.conf_notbill, pred.conf_old50);
     
     // Check confidence threshold
     if (maxConf < CONFIDENCE) continue;
     
     // Determine class
     let classIdx = 0;
-    if (conf_notbill > conf_new50 && conf_notbill > conf_old50) classIdx = 1;
-    else if (conf_old50 > conf_new50 && conf_old50 > conf_notbill) classIdx = 2;
+    if (pred.conf_notbill > pred.conf_new50 && pred.conf_notbill > pred.conf_old50) classIdx = 1;
+    else if (pred.conf_old50 > pred.conf_new50 && pred.conf_old50 > pred.conf_notbill) classIdx = 2;
     
     const classes = ['new_50', 'not_bill', 'old_50'];
     const className = classes[classIdx];
     
     // Scale coordinates back to original image size
-    // The model was trained on 704x704, need to scale back to original
     const scaleX = imgWidth / INPUT_SIZE;
     const scaleY = imgHeight / INPUT_SIZE;
     
-    const scaledX = x_center * scaleX;
-    const scaledY = y_center * scaleY;
-    const scaledW = w * scaleX;
-    const scaledH = h * scaleY;
+    const scaledX = pred.x * scaleX;
+    const scaledY = pred.y * scaleY;
+    const scaledW = pred.w * scaleX;
+    const scaledH = pred.h * scaleY;
     
     detections.push({
       x: scaledX,
@@ -262,7 +299,7 @@ function postprocessOutputs(outputs, imgWidth, imgHeight) {
     });
   }
   
-  console.log('[ONNX] Found', detections.length, 'detections');
+  console.log('[ONNX] Found', detections.length, 'detections above threshold');
   return detections;
 }
 
@@ -299,15 +336,18 @@ async function detect() {
     const tensor = new ort.Tensor('float32', imageData, [1, 3, INPUT_SIZE, INPUT_SIZE]);
     
     console.log('[ONNX] Running inference...');
-    // Try common input names - the model might use 'images' or 'input'
-    let outputs;
-    try {
-      outputs = await session.run({ images: tensor });
-    } catch (e) {
-      console.log('[ONNX] "images" failed, trying "input"...');
-      outputs = await session.run({ input: tensor });
-    }
+    console.log('[ONNX] Session inputs:', Object.keys(session.inputNames));
+    console.log('[ONNX] Session outputs:', Object.keys(session.outputNames));
     
+    // Use the actual input name from the model
+    const inputName = session.inputNames[0];
+    const inputs = {};
+    inputs[inputName] = tensor;
+    
+    console.log('[ONNX] Creating input with name:', inputName);
+    const outputs = await session.run(inputs);
+    
+    console.log('[ONNX] Raw outputs:', Object.keys(outputs));
     console.log('[ONNX] Postprocessing outputs...');
     const detections = postprocessOutputs(outputs, imgWidth, imgHeight);
     
