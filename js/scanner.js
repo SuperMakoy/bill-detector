@@ -227,15 +227,18 @@ function postprocessOutputs(outputs, imgWidth, imgHeight) {
     // If rows is small (like 7 for coords+classes), it's transposed
     if (rows < 100) {
       // Format: [1, 7, N] - need to iterate through N predictions
+      // Data is flattened, so we skip batch dimension and iterate through predictions
+      const offset = rows * cols; // Skip batch dimension
       for (let i = 0; i < cols; i++) {
+        const baseIdx = offset + i * rows;
         predictions.push({
-          x: data[i * rows + 0],
-          y: data[i * rows + 1],
-          w: data[i * rows + 2],
-          h: data[i * rows + 3],
-          conf_new50: data[i * rows + 4],
-          conf_notbill: data[i * rows + 5],
-          conf_old50: data[i * rows + 6]
+          x: data[baseIdx + 0],
+          y: data[baseIdx + 1],
+          w: data[baseIdx + 2],
+          h: data[baseIdx + 3],
+          conf_new50: data[baseIdx + 4],
+          conf_notbill: data[baseIdx + 5],
+          conf_old50: data[baseIdx + 6]
         });
       }
     } else {
