@@ -205,8 +205,14 @@ function postprocessOutputs(outputs, imgWidth, imgHeight) {
   
   console.log('[ONNX] Output key:', outputKey);
   console.log('[ONNX] Output shape:', output.dims);
+  console.log('[ONNX] Data type:', typeof data, 'Constructor:', data.constructor.name);
   console.log('[ONNX] Data length:', data.length);
   console.log('[ONNX] First 10 values:', Array.from(data).slice(0, 10));
+  
+  if (!data || data.length === 0) {
+    console.warn('[ONNX] Output data is empty!');
+    return [];
+  }
   
   // Handle different output tensor formats
   let predictions = [];
@@ -353,8 +359,11 @@ async function detect() {
     
     processDetections(detections, imgWidth, imgHeight);
   } catch (e) {
-    console.error('[ONNX] Error during detection:', e);
-    showResult('error', 'Detection failed', 'An error occurred. Check console for details.', []);
+    console.error('[ONNX] Error during detection:', e.message);
+    console.error('[ONNX] Stack:', e.stack);
+    console.error('[ONNX] Full error:', e);
+    const msg = e.message || String(e);
+    showResult('error', 'Detection failed', `Error: ${msg}`, []);
     showToast('Detection failed', 'error');
   } finally {
     loader.style.display = 'none';
