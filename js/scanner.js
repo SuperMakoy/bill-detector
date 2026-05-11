@@ -376,8 +376,8 @@ function processDetections(preds, imgWidth, imgHeight) {
   if (valid.length === 0) {
     playFeedback('warning');
     showResult('warning',
-      notBill ? 'Not a ₱50 bill' : 'No bills found',
-      'Try a clearer photo with the bills visible.',
+      notBill ? 'Not a ₱50 bill' : 'No ₱50 bills found',
+      'Try a clearer photo with the ₱50 bills visible.',
       []
     );
     return;

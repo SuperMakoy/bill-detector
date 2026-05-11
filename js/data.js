@@ -189,18 +189,88 @@ function getEmptyWeek() {
 }
 
 /**
- * Loads data from localStorage (device-specific)
+ * Returns the ISO year-week string for a given Date (e.g. "2026-W19").
+ * Week starts on Monday (ISO 8601).
+ * @param {Date} date
+ * @returns {string}
+ */
+function getISOWeekKey(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  // Set to nearest Thursday: current date + 4 - current day number (Mon=1 … Sun=7)
+  const day = d.getUTCDay() || 7; // make Sunday = 7
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+/**
+ * Checks whether the stored week belongs to a previous calendar week.
+ * If so, auto-archives it to history and starts a fresh week.
+ * Called on every loadData() so it runs transparently on app open.
+ * @param {Object} raw - The raw data object from localStorage (mutated in place if needed)
+ * @returns {boolean} true if a week was auto-rolled over
+ */
+function maybeAutoRollWeek(raw) {
+  const currentWeekKey = getISOWeekKey(new Date());
+  const storedWeekKey  = raw.weekKey || null;
+
+  // First launch or same week → nothing to do
+  if (!storedWeekKey || storedWeekKey === currentWeekKey) {
+    // Make sure weekKey is set (handles first launch)
+    if (!raw.weekKey) raw.weekKey = currentWeekKey;
+    return false;
+  }
+
+  // We're in a new week — archive the old one if it has any data
+  const stats = getWeekStats(raw.currentWeek);
+  const hasData = stats.old > 0 || stats.new > 0 || stats.scans > 0;
+
+  if (hasData) {
+    const savedAt = new Date().toLocaleDateString('en-PH', {
+      year: 'numeric', month: 'long', day: 'numeric'
+    });
+    raw.history = raw.history || [];
+    raw.history.push({
+      savedAt,
+      stats,
+      days: JSON.parse(JSON.stringify(raw.currentWeek))
+    });
+  }
+
+  raw.currentWeek = getEmptyWeek();
+  raw.weekKey     = currentWeekKey;
+  return true;
+}
+
+/**
+ * Loads data from localStorage (device-specific).
+ * Automatically rolls over to a new week when the calendar week changes.
  * @returns {Object} Application data with currentWeek and history
  */
 function loadData() {
   const raw = localStorage.getItem(getStorageKey());
+  let data;
+
   if (!raw) {
-    return {
+    data = {
       currentWeek: getEmptyWeek(),
-      history: []
+      history: [],
+      weekKey: getISOWeekKey(new Date())
     };
+  } else {
+    data = JSON.parse(raw);
   }
-  return JSON.parse(raw);
+
+  // Auto-rollover: if we're in a new week, archive and reset
+  const rolled = maybeAutoRollWeek(data);
+  if (rolled) {
+    // Persist the rollover immediately
+    localStorage.setItem(getStorageKey(), JSON.stringify(data));
+    showToast('New week started — last week saved to History', 'success');
+  }
+
+  return data;
 }
 
 /**
@@ -208,6 +278,8 @@ function loadData() {
  * @param {Object} data - Application data to save
  */
 function saveData(data) {
+  // Always persist the current week key so rollover detection works
+  if (!data.weekKey) data.weekKey = getISOWeekKey(new Date());
   localStorage.setItem(getStorageKey(), JSON.stringify(data));
 }
 
@@ -336,6 +408,8 @@ function endWeek() {
   });
   
   data.currentWeek = getEmptyWeek();
+  // Advance the week key so auto-rollover doesn't double-archive
+  data.weekKey = getISOWeekKey(new Date());
   saveData(data);
   lastScanBackup = null;
   
