@@ -1137,3 +1137,140 @@ body {
   #print-receipt { display: block !important; width: 100%; }
   @page { size: 80mm 200mm; margin: 0; }
 }
+
+
+.camera-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 100%;
+  max-width: 640px;
+  box-shadow: var(--shadow-lg);
+  animation: modalIn 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.camera-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.camera-video-wrap {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#cameraVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.camera-modal-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.camera-capture-btn {
+  flex: 1;
+}
+
+.camera-error {
+  background: var(--red-light);
+  border: 1px solid #E8B4BA;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 0.78rem;
+  color: var(--red);
+}
+
+/* On mobile the camera modal should never appear (openCamera goes
+   straight to the native input), but just in case: */
+@media (max-width: 900px) {
+  .camera-modal {
+    max-width: 100%;
+    border-radius: var(--radius) var(--radius) 0 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+}
+
+:root {
+  --pink:        #F4AECF;
+  --pink-light:  #FFF0F7;
+  --pink-border: #F9C8DF;
+}
+
+/* Logo divider line — barely-there pink instead of gray */
+.logo {
+  border-bottom-color: var(--pink-border);
+}
+
+/* Upload Photo button — pink hover to complement the green camera button */
+.capture-btn.upload:hover {
+  border-color: var(--pink);
+  background: var(--pink-light);
+}
+
+/* Day note textarea — pink focus ring */
+.day-note:focus {
+  border-color: var(--pink);
+  box-shadow: 0 0 0 3px rgba(244, 174, 207, 0.18);
+}
+
+/* Import modal textarea — same pink focus ring */
+.import-textarea:focus {
+  border-color: var(--pink) !important;
+  box-shadow: 0 0 0 3px rgba(244, 174, 207, 0.18);
+}
+
+/* Scan log items — faint pink blush on hover */
+.scan-item:hover {
+  background: var(--pink-light);
+}
+
+/* Stat items (Old Bills / New Bills / Scans) — pink outline on hover */
+.stat-item:hover {
+  border-color: var(--pink);
+}
+
+/* Week view day cards — pink glow on hover */
+.day-card:hover {
+  border-color: var(--pink);
+  box-shadow: 0 0 0 3px rgba(249, 200, 223, 0.25);
+}
+
+/* History week cards — pink border on hover */
+.history-week-card:hover {
+  border-color: var(--pink);
+}
+
+/* Topbar icon button — pink border on hover */
+.icon-btn:hover {
+  border-color: var(--pink-border);
+  color: var(--text);
+}
+
+/* Sidebar week summary card — delicate pink top stripe */
+.week-summary {
+  border-top: 2px solid var(--pink-border);
+}
+
+/* Settings cards — pink border on hover */
+.setting-card:hover {
+  border-color: var(--pink-border);
+  transition: border-color 0.2s;
+}

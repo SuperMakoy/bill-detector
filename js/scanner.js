@@ -81,8 +81,17 @@ async function loadModel() {
   }
 }
 
+/**
+ * Opens the camera.
+ * On mobile: uses native file input with capture="environment" (original behaviour).
+ * On desktop: opens a getUserMedia camera modal so the webcam actually fires.
+ */
 function openCamera() {
-  document.getElementById('cameraInput').click();
+  if (getDeviceType() === 'desktop') {
+    openDesktopCamera();
+  } else {
+    document.getElementById('cameraInput').click();
+  }
 }
 
 let audioCtx = null;
@@ -459,4 +468,105 @@ function drawBoxes(bills, imgWidth, imgHeight) {
     ctx.fillStyle = '#fff';
     ctx.fillText(label, x1 + 7, y1 - 7);
   });
+}
+
+/* ─────────────────────────────────────────────────────────────
+   DESKTOP CAMERA  (getUserMedia — only used on non-mobile)
+   Mobile still uses the native cameraInput file input above.
+───────────────────────────────────────────────────────────── */
+
+let cameraStream = null;
+
+/**
+ * Opens the webcam modal on desktop.
+ * Falls back to the native file picker if permission is denied or
+ * getUserMedia is unavailable.
+ */
+async function openDesktopCamera() {
+  const modal = document.getElementById('cameraModalOverlay');
+  const video = document.getElementById('cameraVideo');
+  const errorEl = document.getElementById('cameraError');
+
+  errorEl.style.display = 'none';
+  modal.classList.add('open');
+
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    video.srcObject = cameraStream;
+  } catch (err) {
+    console.warn('[Camera] getUserMedia failed:', err.name, err.message);
+    closeDesktopCamera();
+
+    if (err.name === 'NotAllowedError') {
+      showToast('Camera permission denied — using file picker', 'warning');
+    } else {
+      showToast('Camera unavailable — using file picker', 'warning');
+    }
+    // Graceful fallback to file picker
+    document.getElementById('cameraInput').click();
+  }
+}
+
+/**
+ * Captures the current video frame, converts it to a File, and loads it
+ * into the app exactly as if the user had picked a file from disk.
+ */
+function captureDesktopFrame() {
+  const video = document.getElementById('cameraVideo');
+
+  if (!video.videoWidth || !video.videoHeight) {
+    showToast('Camera not ready yet — wait a moment', 'warning');
+    return;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+
+  canvas.toBlob(blob => {
+    const file = new File([blob], 'desktop-capture.jpg', { type: 'image/jpeg' });
+    closeDesktopCamera();
+
+    // Load the captured frame into the app (mirrors handleFile logic)
+    currentFile = file;
+    const preview = document.getElementById('preview');
+    preview.onload = () => {
+      const boxCanvas = document.getElementById('boxCanvas');
+      boxCanvas.getContext('2d').clearRect(0, 0, boxCanvas.width, boxCanvas.height);
+    };
+    preview.src = URL.createObjectURL(file);
+
+    document.getElementById('previewWrap').style.display  = 'block';
+    document.getElementById('captureOptions').style.display = 'none';
+
+    const scanBtn = document.getElementById('scanBtn');
+    if (modelReady) {
+      scanBtn.disabled  = false;
+      scanBtn.textContent = 'Detect Bills';
+    } else {
+      scanBtn.disabled  = true;
+      scanBtn.textContent = 'Loading AI model...';
+    }
+
+    document.getElementById('retakeBtn').style.display  = 'block';
+    document.getElementById('resultBox').style.display  = 'none';
+  }, 'image/jpeg', 0.92);
+}
+
+/**
+ * Closes and cleans up the desktop camera modal.
+ */
+function closeDesktopCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  const modal = document.getElementById('cameraModalOverlay');
+  if (modal) modal.classList.remove('open');
+  const video = document.getElementById('cameraVideo');
+  if (video) video.srcObject = null;
 }
