@@ -169,20 +169,22 @@ function generateReceiptHash() {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   PRINT  — opens a clean new window so mobile browsers can
-   trigger the system print / Save as PDF sheet properly.
+   PRINT  — Desktop only.
+   The Print button is hidden on mobile via CSS (.report-btn-print).
+   Opens a clean new window so desktop browsers can trigger the
+   system print / Save as PDF sheet properly.
 ───────────────────────────────────────────────────────────── */
 
 /**
  * Prints today's report via a dedicated print window.
- * Works on desktop and mobile (iOS Share → Print, Android print dialog).
+ * Only reachable on desktop — button is hidden on mobile via CSS.
  */
 function printReport() {
   const d   = getTodayData();
   const now = new Date();
-  const dateStr    = now.toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  const timeStr    = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
-  const receiptId  = generateReceiptId();
+  const dateStr     = now.toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr     = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+  const receiptId   = generateReceiptId();
   const receiptHash = generateReceiptHash();
 
   const logRows = d.log.map(item =>
@@ -253,13 +255,12 @@ function printReport() {
     window.onload = function() {
       setTimeout(function() { window.print(); }, 600);
     };
-  </script>
+  <\/script>
 </body>
 </html>`;
 
   const win = window.open('', '_blank');
   if (!win) {
-    // Popup blocked — fall back to same-window print via hidden div
     const el = document.getElementById('print-receipt');
     el.innerHTML = receiptHTML;
     window.print();
@@ -270,33 +271,54 @@ function printReport() {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   DOWNLOAD  — draws the receipt directly onto a <canvas> so
-   there is zero dependency on html2canvas, external images, or
-   CORS. Works on desktop and mobile (iOS opens image in new tab
-   because Safari ignores <a download>; Android downloads normally).
+   PLATFORM DETECTION
+───────────────────────────────────────────────────────────── */
+
+/**
+ * Returns true if the current device is iOS (iPhone / iPad / iPod)
+ */
+function isIOS() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+/**
+ * Returns true if the current device is Android
+ */
+function isAndroid() {
+  return /android/i.test(navigator.userAgent);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   DOWNLOAD  — Platform-aware PNG export.
+
+   Desktop        → <a download> blob  →  toast "Report downloaded!"
+   Android        → <a download> blob  →  toast "Check your Downloads folder"
+   iOS Safari     → open image in new tab  →  toast "Long-press → Save to Photos"
+
+   Pure Canvas 2D API — no html2canvas or external libs needed.
 ───────────────────────────────────────────────────────────── */
 
 /**
  * Downloads today's report as a PNG image.
- * Uses the Canvas 2D API directly — no html2canvas required.
  */
 function downloadReportImage() {
   const d   = getTodayData();
   const now = new Date();
-  const dateStr    = now.toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  const timeStr    = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
-  const receiptId  = generateReceiptId();
+  const dateStr     = now.toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr     = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+  const receiptId   = generateReceiptId();
   const receiptHash = generateReceiptHash();
-  const filename   = `bill-report-${now.toISOString().split('T')[0]}.png`;
+  const filename    = `bill-report-${now.toISOString().split('T')[0]}.png`;
 
-  // Layout constants
-  const W      = 360;
-  const PAD    = 24;
-  const DPR    = 2;           // retina quality
-  const ENTRY  = 30;          // height per log row
-  const noteH  = d.note ? 20 : 0;
-  const logH   = Math.max(d.log.length, 1) * ENTRY;
-  const H      = 340 + logH + noteH;
+  // ── Layout constants ──────────────────────────────────────
+  const W     = 360;
+  const PAD   = 24;
+  const DPR   = 2;        // retina quality
+  const ENTRY = 30;       // px per log row
+  const noteH = d.note ? 20 : 0;
+  const logH  = Math.max(d.log.length, 1) * ENTRY;
+  const H     = 340 + logH + noteH;
 
   const canvas = document.createElement('canvas');
   canvas.width  = W * DPR;
@@ -304,7 +326,7 @@ function downloadReportImage() {
   const ctx = canvas.getContext('2d');
   ctx.scale(DPR, DPR);
 
-  // ── helpers ──────────────────────────────────────────────
+  // ── Drawing helpers ───────────────────────────────────────
   const hr = (y, thick = false) => {
     ctx.beginPath();
     ctx.moveTo(PAD, y);
@@ -319,10 +341,10 @@ function downloadReportImage() {
     ctx.fillStyle = opts.color || '#000';
     ctx.textAlign = opts.align || 'left';
     ctx.fillText(String(text), x, y);
-    ctx.textAlign = 'left'; // reset
+    ctx.textAlign = 'left';
   };
 
-  // ── background ───────────────────────────────────────────
+  // ── Background ────────────────────────────────────────────
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
 
@@ -337,9 +359,9 @@ function downloadReportImage() {
   hr(y); y += 16;
 
   // Date / time / ID
-  txt(dateStr,            W / 2, y,      { size: 11, color: '#555', align: 'center' }); y += 16;
+  txt(dateStr,                 W / 2, y, { size: 11, color: '#555', align: 'center' }); y += 16;
   txt(`Generated: ${timeStr}`, W / 2, y, { size: 11, color: '#666', align: 'center' }); y += 16;
-  txt(`ID: ${receiptId}`, W / 2, y,      { size: 10, color: '#888', align: 'center', mono: true }); y += 16;
+  txt(`ID: ${receiptId}`,      W / 2, y, { size: 10, color: '#888', align: 'center', mono: true }); y += 16;
 
   if (d.note) {
     txt(`Note: ${d.note}`, W / 2, y, { size: 10, color: '#555', align: 'center' });
@@ -355,9 +377,9 @@ function downloadReportImage() {
     y += ENTRY;
   } else {
     for (const item of d.log) {
-      txt(item.time,   PAD,           y + 12, { size: 10, color: '#777' });
-      txt(item.desc,   PAD + 54,      y + 12, { size: 11, color: '#222' });
-      txt(`₱${item.amount}`, W - PAD, y + 12, { size: 11, color: '#000', bold: true, align: 'right', mono: true });
+      txt(item.time,         PAD,      y + 12, { size: 10, color: '#777' });
+      txt(item.desc,         PAD + 54, y + 12, { size: 11, color: '#222' });
+      txt(`₱${item.amount}`, W - PAD,  y + 12, { size: 11, color: '#000', bold: true, align: 'right', mono: true });
       y += ENTRY;
     }
   }
@@ -365,46 +387,72 @@ function downloadReportImage() {
   hr(y); y += 16;
 
   // Subtotals
-  txt(`Old Bills (₱50)`,         PAD,      y, { size: 12, color: '#333' });
+  txt('Old Bills (₱50)',                  PAD,     y, { size: 12, color: '#333' });
   txt(`${d.old} × ₱50 = ₱${d.old * 50}`, W - PAD, y, { size: 12, color: '#333', align: 'right' });
   y += 22;
 
-  txt(`New Bills (₱50)`,         PAD,      y, { size: 12, color: '#333' });
+  txt('New Bills (₱50)',                  PAD,     y, { size: 12, color: '#333' });
   txt(`${d.new} × ₱50 = ₱${d.new * 50}`, W - PAD, y, { size: 12, color: '#333', align: 'right' });
   y += 20;
 
   hr(y, true); y += 18;
 
   // Grand total
-  txt('TOTAL',     PAD,      y + 2, { size: 17, bold: true, color: '#000' });
+  txt('TOTAL',       PAD,     y + 2, { size: 17, bold: true, color: '#000' });
   txt(`₱${d.total}`, W - PAD, y + 2, { size: 20, bold: true, color: '#000', align: 'right', mono: true });
   y += 36;
 
   // Footer hash
   txt(receiptHash, W / 2, y, { size: 9, color: '#ddd', align: 'center', mono: true });
 
-  // ── trigger download ──────────────────────────────────────
+  // ── Platform-aware export ─────────────────────────────────
   try {
     canvas.toBlob(blob => {
-      const url = URL.createObjectURL(blob);
-      const a   = document.createElement('a');
-      a.href     = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      if (!blob) {
+        showToast('Could not generate image', 'error');
+        return;
+      }
 
-      // iOS Safari ignores <a download> — open image in new tab as fallback
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-      }, 2000);
+      if (isIOS()) {
+        // iOS Safari ignores <a download> entirely.
+        // Open the image in a new tab — user long-presses to save.
+        const url = URL.createObjectURL(blob);
+        const win = window.open(url, '_blank');
+        if (!win) {
+          // Popup blocked — fallback to FileReader data URL
+          const reader = new FileReader();
+          reader.onload = () => window.open(reader.result, '_blank');
+          reader.readAsDataURL(blob);
+        }
+        showToast('Long-press the image → Save to Photos', 'warning');
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+      } else {
+        // Desktop & Android — standard blob download
+        const url = URL.createObjectURL(blob);
+        const a   = document.createElement('a');
+        a.href     = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+        if (isAndroid()) {
+          showToast('Saved! Check your Downloads folder', 'success');
+        } else {
+          showToast('Report downloaded!', 'success');
+        }
+      }
     }, 'image/png');
+
   } catch (e) {
     // Hard fallback for any canvas security error
     try {
       window.open(canvas.toDataURL('image/png'), '_blank');
+      showToast('Long-press the image to save it', 'warning');
     } catch (e2) {
-      showToast('Download failed — try Print instead', 'error');
+      showToast('Download failed — try a screenshot instead', 'error');
     }
   }
 }

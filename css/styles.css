@@ -1117,6 +1117,9 @@ body {
   .capture-options { flex-direction: column; }
   .capture-btn { padding: 14px; }
   .capture-icon { width: 40px; height: 40px; }
+
+  /* Hide Print button on mobile — not functional on iOS/Android */
+  .report-btn-print { display: none !important; }
 }
 
 /* scrollbar */
